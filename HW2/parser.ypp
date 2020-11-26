@@ -1,0 +1,56 @@
+%{
+	extern int yylex();
+	void yyerror(const char*);
+	#include "output.hpp"
+%}
+
+%nonassoc VOID;
+%nonassoc INT;
+%nonassoc BYTE;
+%nonassoc B;
+%nonassoc BOOL;
+%nonassoc SET;
+%nonassoc TRUE;
+%nonassoc FALSE;
+%nonassoc RETURN;
+%nonassoc WHILE;
+%nonassoc BREAK;
+%nonassoc CONTINUE;
+%nonassoc SC;
+%nonassoc COMMA;
+%nonassoc RELOPN;
+%nonassoc DOTS;
+%nonassoc ID;
+%nonassoc NUM;
+%nonassoc STRING;
+%nonassoc RELOPN;
+
+%left AND;
+%left OR;
+%right NOT;
+%left LPAREN;
+%left RPAREN;
+%left LBRACKET;
+%left RBRACKET;
+%right ASSIGN;
+%left RELOPL;
+%left BINOP;
+
+
+
+
+
+%%
+
+%%
+
+int main()
+{
+	return yyparse();
+}
+
+int yyerror(const char * message)
+{
+	output::errorSyn(yylineno);
+	exit(0);
+}

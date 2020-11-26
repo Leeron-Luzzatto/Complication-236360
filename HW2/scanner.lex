@@ -37,7 +37,8 @@ continue                              return CONTINUE;
 (\[)                                  return LBRACKET;
 (\])                                  return RBRACKET;
 (\=)                                  return ASSIGN;
-(((\=|\!|\<|\>)\=)|\<|\>|in)          return RELOP;
+(==|!=)                               return RELOPL;
+>=|>|<|<=                             return RELOPN;
 (\+|\-|\*|\/)                         return BINOP;
 (\.\.)                                return DOTS;
 [a-zA-Z][a-zA-Z0-9]*                  return ID;
@@ -46,7 +47,7 @@ continue                              return CONTINUE;
 
 //[^\r\n]*[\r|\n|\r\n]?                         ;
 {whitespace}				                    ;
-.		                              return UNKNOWNCommand;
+.		                              {output::errorLex(yylineno); exit(0);};
 
 
 %%
