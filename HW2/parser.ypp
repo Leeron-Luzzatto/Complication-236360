@@ -23,24 +23,93 @@
 %nonassoc ID;
 %nonassoc NUM;
 %nonassoc STRING;
-%nonassoc RELOPN;
+%nonassoc LBRACE;
+%nonassoc RBRACE;
 
 %left AND;
 %left OR;
-%right NOT;
-%left LPAREN;
 %left RPAREN;
-%left LBRACKET;
 %left RBRACKET;
 %right ASSIGN;
 %left RELOPL;
-%left BINOP;
-
-
-
+%left PLUSMINUS
+%left MULDIV;
+%right IF;
+%right ELSE;
+%left LBRACKET;
+%left LPAREN;
+%right NOT;
 
 
 %%
+
+Program     :   Funcs{output::printProductionRule(1);}
+            ;
+
+Funcs       :   {output::printProductionRule(2);}   |   FuncDecl Funcs{output::printProductionRule(3);}
+            ;
+
+FuncDecl    :   RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE{output::printProductionRule(4);}
+            ;
+
+RetType     :   Type{output::printProductionRule(5);}   |   VOID{output::printProductionRule(6);}
+            ;
+
+Formals     :   {output::printProductionRule(7);}   |   FormalsList{output::printProductionRule(8);}
+            ;
+
+FormalsList :   FormalDecl{output::printProductionRule(9);} |   FormalDecl COMMA FormalsList{output::printProductionRule(10);}
+            ;
+
+FormalDecl :   Type ID{output::printProductionRule(11);}
+            ;
+
+Statements  :   Statement{output::printProductionRule(12);} |   Statements Statement{output::printProductionRule(13);}
+            ;
+
+Statement   :   LBRACE Statements RBRACE   {output::printProductionRule(14);}  |
+                Type ID SC                 {output::printProductionRule(15);}  |
+                Type ID ASSIGN Exp SC      {output::printProductionRule(16);}  |
+                ID ASSIGN Exp SC           {output::printProductionRule(17);}  |
+                Call SC                    {output::printProductionRule(18);}  |
+                RETURN SC                  {output::printProductionRule(19);}  |
+                RETURN Exp SC              {output::printProductionRule(20);}  |
+                IF LPAREN Exp RPAREN Statement {output::printProductionRule(21);}  |
+                IF LPAREN Exp RPAREN Statement ELSE Statement  {output::printProductionRule(22);}  |
+                WHILE LPAREN Exp RPAREN Statement  {output::printProductionRule(23);}  |
+                BREAK SC                   {output::printProductionRule(24);}  |
+                CONTINUE SC                {output::printProductionRule(21);}
+            ;
+
+Call        :   ID LPAREN ExpList RPAREN{output::printProductionRule(26);}  |
+                ID LPAREN RPAREN        {output::printProductionRule(27);}
+            ;
+
+ExpList     :   Exp{output::printProductionRule(28);}   |   Exp COMMA ExpList{output::printProductionRule(29);}
+            ;
+
+Type        :   INT{output::printProductionRule(30);}   |   BYTE{output::printProductionRule(31);}  |
+                BOOL{output::printProductionRule(32);}  |
+                SET LBRACKET NUM DOTS NUM RBRACKET{output::printProductionRule(33);}
+            ;
+
+Exp         :   LPAREN Exp RPAREN   {output::printProductionRule(34);}   |
+                Exp MULDIV Exp      {output::printProductionRule(35);}   |
+                Exp PLUSMINUS Exp   {output::printProductionRule(35);}   |
+                ID                  {output::printProductionRule(36);}   |
+                Call                {output::printProductionRule(37);}   |
+                NUM                 {output::printProductionRule(38);}   |
+                NUM B               {output::printProductionRule(39);}   |
+                STRING              {output::printProductionRule(40);}   |
+                TRUE                {output::printProductionRule(41);}   |
+                FALSE               {output::printProductionRule(42);}   |
+                NOT Exp             {output::printProductionRule(43);}   |
+                Exp AND Exp         {output::printProductionRule(44);}   |
+                Exp OR Exp          {output::printProductionRule(45);}   |
+                Exp RELOPL Exp      {output::printProductionRule(46);}   |
+                Exp RELOPN Exp      {output::printProductionRule(46);}   |
+                LPAREN Type RPAREN Exp  {output::printProductionRule(47);}
+            ;
 
 %%
 

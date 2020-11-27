@@ -6,7 +6,7 @@ using namespace std;
 
 const string output::rules[] = {
 	"Program -> Funcs", // 1
-	"Funcs -> epsilon",
+	"Funcs -> epsilon", //2
 	"Funcs -> FuncDecl Funcs",
 	"FuncDecl -> RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE",
 	"RetType -> Type", // 5

@@ -37,15 +37,15 @@ continue                              return CONTINUE;
 (\[)                                  return LBRACKET;
 (\])                                  return RBRACKET;
 (\=)                                  return ASSIGN;
-(==|!=)                               return RELOPL;
+(==|!=|in)                            return RELOPL;
 >=|>|<|<=                             return RELOPN;
-(\+|\-|\*|\/)                         return BINOP;
+(\+|\-)                               return PLUSMINUS;
+(\*|\/)                               return MULDIV;
 (\.\.)                                return DOTS;
 [a-zA-Z][a-zA-Z0-9]*                  return ID;
 0|[1-9][0-9]*                         return NUM;
 \"([^\n\r\"\\]|\\[rnt"\\])+\"         return STRING;
-
-//[^\r\n]*[\r|\n|\r\n]?                         ;
+\/\/[^\r\n]*[\r|\n|\r\n]?                         ;
 {whitespace}				                    ;
 .		                              {output::errorLex(yylineno); exit(0);};
 
