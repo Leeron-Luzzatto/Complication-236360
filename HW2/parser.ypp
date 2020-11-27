@@ -1,5 +1,6 @@
 %{
 	extern int yylex();
+    extern int yylineno;
 	void yyerror(const char*);
 	#include "output.hpp"
 %}
@@ -118,7 +119,7 @@ int main()
 	return yyparse();
 }
 
-int yyerror(const char * message)
+void yyerror(const char * message)
 {
 	output::errorSyn(yylineno);
 	exit(0);
