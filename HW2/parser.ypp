@@ -27,8 +27,8 @@
 %nonassoc LBRACE;
 %nonassoc RBRACE;
 
-%left AND;
 %left OR;
+%left AND;
 %left RPAREN;
 %left RBRACKET;
 %right ASSIGN;
