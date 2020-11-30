@@ -5,6 +5,18 @@
 	#include "output.hpp"
 %}
 
+%right ASSIGN;
+%left OR;
+%left AND;
+%left RELOPL;
+%nonassoc RELOPN;
+%left PLUSMINUS
+%left MULDIV;
+%left RPAREN;
+%left RBRACKET;
+%left LBRACKET;
+%left LPAREN;
+
 %nonassoc VOID;
 %nonassoc INT;
 %nonassoc BYTE;
@@ -19,7 +31,6 @@
 %nonassoc CONTINUE;
 %nonassoc SC;
 %nonassoc COMMA;
-%nonassoc RELOPN;
 %nonassoc DOTS;
 %nonassoc ID;
 %nonassoc NUM;
@@ -27,20 +38,10 @@
 %nonassoc LBRACE;
 %nonassoc RBRACE;
 
-%left OR;
-%left AND;
-%left RPAREN;
-%left RBRACKET;
-%right ASSIGN;
-%left RELOPL;
-%left PLUSMINUS
-%left MULDIV;
+
 %right IF;
 %right ELSE;
-%left LBRACKET;
-%left LPAREN;
 %right NOT;
-
 
 %%
 
