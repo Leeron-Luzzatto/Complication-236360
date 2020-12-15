@@ -46,8 +46,8 @@ continue                              {yylval = new Node(yytext); return CONTINU
 [a-zA-Z][a-zA-Z0-9]*                  {yylval = new Node(yytext); return ID;}
 0|[1-9][0-9]*                         {yylval = new Node(yytext); return NUM;}
 \"([^\n\r\"\\]|\\[rnt"\\])+\"         {yylval = new Node(yytext); return STRING;}
-\/\/[^\r\n]*[\r|\n|\r\n]?                         ;
-{whitespace}				                    ;
+\/\/[^\r\n]*[\r|\n|\r\n]?             ;
+{whitespace}				          ;
 .		                              {output::errorLex(yylineno); exit(0);};
 
 

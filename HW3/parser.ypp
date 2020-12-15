@@ -2,7 +2,10 @@
 	extern int yylex();
     extern int yylineno;
 	void yyerror(const char*);
-	#include "output.hpp"
+	#include "hw3_output.hpp"
+	#include "parser.h"
+	#include "Table.h"
+	SymbolTable* table;
 %}
 
 %right ASSIGN;
@@ -45,33 +48,36 @@
 
 %%
 
-Program     :   Funcs{output::printProductionRule(1);}
+Program     :   M Funcs{$$ = $1; table->ScopeEnd();}
             ;
 
-Funcs       :   {output::printProductionRule(2);}   |   FuncDecl Funcs{output::printProductionRule(3);}
+M           :   {table = new SymbolTable();}
+
+Funcs       :   {$$ = new Funcs();}   |   FuncDecl Funcs{$$ = new Funcs();}
             ;
 
-FuncDecl    :   RetType ID LPAREN Formals RPAREN LBRACE Statements RBRACE{output::printProductionRule(4);}
+FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4);}
+                LBRACE Statements RBRACE{table->ScopeEnd();}
             ;
 
-RetType     :   Type{output::printProductionRule(5);}   |   VOID{output::printProductionRule(6);}
+RetType     :   Type{$$ = $1}   |   VOID{$$ = $1}
             ;
 
-Formals     :   {output::printProductionRule(7);}   |   FormalsList{output::printProductionRule(8);}
+Formals     :   {$$ = new FormalsList();}   |   FormalsList{$$ = $1;}
             ;
 
-FormalsList :   FormalDecl{output::printProductionRule(9);} |   FormalDecl COMMA FormalsList{output::printProductionRule(10);}
+FormalsList :   FormalDecl{$$ = new FormalsList();} |   FormalDecl COMMA FormalsList{$$ = new FormalsList($1, $3);}
             ;
 
-FormalDecl :   Type ID{output::printProductionRule(11);}
+FormalDecl :   Type ID{$$ = new Arguments($1, $2);}
             ;
 
-Statements  :   Statement{output::printProductionRule(12);} |   Statements Statement{output::printProductionRule(13);}
+Statements  :   Statement{$$ = new Statements($1)} |   Statements Statement{$$ = new Statements($2, $1);}
             ;
 
-Statement   :   LBRACE Statements RBRACE   {output::printProductionRule(14);}  |
-                Type ID SC                 {output::printProductionRule(15);}  |
-                Type ID ASSIGN Exp SC      {output::printProductionRule(16);}  |
+Statement   :   LBRACE {table->newScope();} Statements RBRACE   {table->ScopeEnd(); $$ = $2;}  |
+                Type ID SC                 {table->addVar($1, $2); $$ = new Argument($1, $2);}  |
+                Type ID ASSIGN Exp SC      {table->addVar($1, $2); $$ = new Argument($1, $2, $4);}  |
                 ID ASSIGN Exp SC           {output::printProductionRule(17);}  |
                 Call SC                    {output::printProductionRule(18);}  |
                 RETURN SC                  {output::printProductionRule(19);}  |
