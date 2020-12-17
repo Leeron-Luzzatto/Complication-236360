@@ -151,7 +151,7 @@ public:
             output::errorDef(yylineno, ((Node*)name)->val);
             exit(0);
         }
-        scope->addEntry(((Node*)name)->val, ((Node*)type)->val, max_offset);
+        scope->addEntry(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
         max_offset++;
     }
     void newScope(bool is_while = false){
@@ -203,6 +203,7 @@ public:
             output::errorMismatch(yylineno);
             exit(0);
         }
+        //TO DO: need to add check that byte or set are in valid range
         //check if byte or
     }
 

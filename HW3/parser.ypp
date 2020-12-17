@@ -99,7 +99,7 @@ ExpList     :   Exp{output::printProductionRule(28);}   |   Exp COMMA ExpList{ou
 
 Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYTE");}  |
                 BOOL{$$ = new Type_var("BOOL");}  |
-                SET LBRACKET NUM DOTS NUM RBRACKET{output::printProductionRule(33);}
+                SET LBRACKET NUM DOTS NUM RBRACKET{$$ = new Type_var("SET", ((Node*)$3)->val, ((Node*)$5)->val);}
             ;
 
 Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
