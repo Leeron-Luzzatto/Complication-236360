@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 using namespace std;
+extern int yylineno;
+
 
 class Entry{
 public:
@@ -43,9 +45,19 @@ public:
         //We use this to add function parameters to table, so no need to increase max_offset
     }
 
-    bool isInScope(const string& id){
+    bool isInScope(const string& id, bool is_function = false){
         for (Entry* e : *(entries)){
             if(e->name == id){
+                if (is_function){
+                    if(!e->is_function) {
+                        continue;
+                    }
+                }
+                else{
+                    if(e->is_function){
+                        continue;
+                    }
+                }
                 return true;
             }
         }
@@ -80,7 +92,7 @@ public:
 
         table->push_back(global);
     }
-    void ScopeEnd(){
+    void FinalScopeEnd(){
         if (!main_found){
             output::errorMainMissing();
             exit(0);
@@ -93,14 +105,24 @@ public:
         max_offset-=s->max_offset;
         table->pop_back();
     }
+    void ScopeEnd(){
+        output::endScope();
+        Scope* s = table->back();
+        for(Entry* e : *(s->entries)){
+            output::printID(e->name, e->offset, e->type);
+        }
+        max_offset-=s->max_offset;
+        table->pop_back();
+    }
     void addFunction(N* rT, N* n, N* aT){
         string func_name = ((Node*)n)->val;
-        if (func_name == "main"){
-            main_found = true;
-        }
-        string retType = ((Node*)rT)->val;
+        string retType = ((Type_var*)rT)->type;
         FormalsList* args = ((FormalsList*)aT);
         args->arg == nullptr ? args = nullptr : args = args;
+
+        if (func_name == "main" && retType == "VOID" && args == nullptr){
+            main_found = true;
+        }
 
         vector<string> argTypes = vector<string>();
         vector<string> argNames = vector<string>();
@@ -125,6 +147,10 @@ public:
     }
     void addVar(N* type, N* name){
         Scope* scope = table->back();
+        if(isVarDeclared(name) || isFuncDeclared(name)){
+            output::errorDef(yylineno, ((Node*)name)->val);
+            exit(0);
+        }
         scope->addEntry(((Node*)name)->val, ((Node*)type)->val, max_offset);
         max_offset++;
     }
@@ -141,5 +167,44 @@ public:
         }
         return false;
     }
+    bool isFuncDeclared(N* n){
+        string name = ((Node*)n)->val;
+        for(Scope* scope : *table){
+            if(scope->isInScope(name, true)){
+                return true;
+            }
+        }
+        return false;
+    }
+    string getVarType(N* n){
+        string name = ((Node*)n)->val;
+        if(!isVarDeclared(n)){
+            output::errorUndef(yylineno, name);
+            exit(0);
+        }
+        //We know variable exits
+        for(Scope* scope : *table){
+            for(Entry* e : *(scope->entries)){
+                if(e->name == name){
+                    //Found it, return type
+                    return e->type;
+                }
+            }
+        }
+    }
+    void checkValidAssign(N* id, N* exp){
+        string var_type = getVarType(id);
+        // Var exists, check types
+        string exp_type = ((Expression*)exp)->type;
+        //Check types are correct
+        if(var_type == exp_type){}
+        else if(var_type == "INT" && exp_type == "BYTE"){}
+        else{
+            output::errorMismatch(yylineno);
+            exit(0);
+        }
+        //check if byte or
+    }
+
 };
 #endif //HW3_TABLE_H

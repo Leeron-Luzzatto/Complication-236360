@@ -25,6 +25,9 @@ struct Node : public N{
         } else if(s == "set"){
             val = "SET";
         }
+        else if(s == "string"){
+            val = "STRING";
+        }
         else
             val = s;
     }
@@ -56,5 +59,29 @@ struct Statements : public N{
     Statements(N* statement = nullptr, N* next = nullptr) : statement(statement), next(next) {}
 };
 
+struct Type_var : public N{
+    string type;
+    // For set
+    int start;
+    int end;
 
+    Type_var(const string &type = "", const string &start = "0", const string &End= "0") : type(type) {
+       int s = stoi(start);
+       int e = stoi(End);
+       this->start = s;
+       this->end = e;
+    }
+};
+
+
+struct Expression : public N{
+    string name;
+    string type;
+    bool bool_value;
+    int number;
+    string str;
+    string op;
+    Expression(const string& name = "", const string& type = "", bool bool_value = false, int number = 0, const string& str = "", const string& op = "")
+            : name(name), type(type), bool_value(bool_value), number(number), str(str), op(op) {}
+};
 #endif //HW3_PARSER_H

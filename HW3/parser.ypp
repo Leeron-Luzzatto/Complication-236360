@@ -13,6 +13,7 @@
 %left AND;
 %left RELOPL;
 %nonassoc RELOPN;
+%nonassoc RELOP_IN;
 %left PLUSMINUS
 %left MULDIV;
 %left RPAREN;
@@ -48,7 +49,7 @@
 
 %%
 
-Program     :   M Funcs{$$ = $1; table->ScopeEnd();}
+Program     :   M Funcs{$$ = $1; table->FinalScopeEnd();}
             ;
 
 M           :   {table = new SymbolTable();}
@@ -60,7 +61,7 @@ FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4)
                 LBRACE Statements RBRACE{table->ScopeEnd();}
             ;
 
-RetType     :   Type{$$ = $1}   |   VOID{$$ = $1}
+RetType     :   Type{$$ = $1}   |   VOID{$$ = new Type_var("VOID");}
             ;
 
 Formals     :   {$$ = new FormalsList();}   |   FormalsList{$$ = $1;}
@@ -78,7 +79,7 @@ Statements  :   Statement{$$ = new Statements($1)} |   Statements Statement{$$ =
 Statement   :   LBRACE {table->newScope();} Statements RBRACE   {table->ScopeEnd(); $$ = $2;}  |
                 Type ID SC                 {table->addVar($1, $2); $$ = new Argument($1, $2);}  |
                 Type ID ASSIGN Exp SC      {table->addVar($1, $2); $$ = new Argument($1, $2, $4);}  |
-                ID ASSIGN Exp SC           {output::printProductionRule(17);}  |
+                ID ASSIGN Exp SC           {table->checkValidAssign($1, $3); }  |
                 Call SC                    {output::printProductionRule(18);}  |
                 RETURN SC                  {output::printProductionRule(19);}  |
                 RETURN Exp SC              {output::printProductionRule(20);}  |
@@ -96,27 +97,32 @@ Call        :   ID LPAREN ExpList RPAREN{output::printProductionRule(26);}  |
 ExpList     :   Exp{output::printProductionRule(28);}   |   Exp COMMA ExpList{output::printProductionRule(29);}
             ;
 
-Type        :   INT{output::printProductionRule(30);}   |   BYTE{output::printProductionRule(31);}  |
-                BOOL{output::printProductionRule(32);}  |
+Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYTE");}  |
+                BOOL{$$ = new Type_var("BOOL");}  |
                 SET LBRACKET NUM DOTS NUM RBRACKET{output::printProductionRule(33);}
             ;
 
-Exp         :   LPAREN Exp RPAREN   {output::printProductionRule(34);}   |
-                Exp MULDIV Exp      {output::printProductionRule(35);}   |
-                Exp PLUSMINUS Exp   {output::printProductionRule(35);}   |
-                ID                  {output::printProductionRule(36);}   |
+Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
+                Exp MULDIV Exp      {string type = MulDivType($1->type, $2->type);
+                                     $$ = new Expression(); $$->type = type;}   |
+                Exp PLUSMINUS Exp   {string type = PlusMinusType($1->type, $2->type);
+                                     $$ = new Expression(); $$->type = type;}   |
+                ID                  {string type = getVarType($1);
+                                     $$ = new Expression(); $$->type = type; $$->name=(((Node*)$1)->val);}   |
                 Call                {output::printProductionRule(37);}   |
-                NUM                 {output::printProductionRule(38);}   |
-                NUM B               {output::printProductionRule(39);}   |
-                STRING              {output::printProductionRule(40);}   |
-                TRUE                {output::printProductionRule(41);}   |
-                FALSE               {output::printProductionRule(42);}   |
-                NOT Exp             {output::printProductionRule(43);}   |
-                Exp AND Exp         {output::printProductionRule(44);}   |
-                Exp OR Exp          {output::printProductionRule(45);}   |
-                Exp RELOPL Exp      {output::printProductionRule(46);}   |
-                Exp RELOPN Exp      {output::printProductionRule(46);}   |
-                LPAREN Type RPAREN Exp  {output::printProductionRule(47);}
+                NUM                 {$$ = new Expression(); $$->type = "INT"; $$->number = atoi((Node*)$1)->val;}   |
+                NUM B               {$$ = new Expression(); $$->type = "BYTE"; $$->number = atoi((Node*)$1)->val;}   |
+                STRING              {$$ = new Expression(); $$->type = "STRING"; $$->str = ((Node*)$1)->val;}   |
+                TRUE                {$$ = new Expression(); $$->type = "BOOL"; $$->bool_value = true;}   |
+                FALSE               {$$ = new Expression(); $$->type = "BOOL"; $$->bool_value = false;}   |
+                NOT Exp             {check_valid_bool($2->type); $$ = new Expression(); $$->type = $2->type;}   |
+                Exp AND Exp         {check_valid_bool($1->type); check_valid_bool($3->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                Exp OR Exp          {check_valid_bool($1->type); check_valid_bool($3->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                Exp RELOPL Exp      {check_valid_relop($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                Exp RELOPN Exp      {check_valid_relop($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                Exp RELOP_IN Exp    {check_valid_in($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                LPAREN Type RPAREN Exp  checkValidCast());
+                                         $$ = new Expression(); $$->type = type;}
             ;
 
 %%
@@ -130,4 +136,68 @@ void yyerror(const char * message)
 {
 	output::errorSyn(yylineno);
 	exit(0);
+}
+
+void checkValidCast(string type, string exp_type){
+    if(exp_type != "SET" || type != "INT"){
+        output::errorMismatch(yylineno);
+        exit(0);
+    }
+}
+
+string PlusMinusType(string a, string b){
+   if(a == b){
+        //both have same type
+        return a;
+   }
+   if(a == "INT" && b == "BYTE"){
+        return "INT";
+   }
+   if(a == "SET"){
+	    if(b == "BYTE" || b == "INT"){
+	        return "SET";
+	    }
+   }
+   else if (b == "SET"){
+       if(a == "BYTE" || a == "INT"){
+       	        return "SET";
+       	    }
+   }
+   output::errorMismatch(yylineno);
+   exit(0);
+}
+
+string MulDivType(string a, string b){
+   if(a == b){
+        //both have same type
+        return a;
+   }
+   if(a == "INT" && b == "BYTE"){
+        return "INT";
+   }
+   output::errorMismatch(yylineno);
+   exit(0);
+}
+
+void check_valid_bool(string exp){
+    if(exp != "BOOL")){
+      output::errorMismatch(yylineno);
+      exit(0);
+   }
+}
+
+void check_valid_in(string type1, string type2){
+    if((type1 == "INT" || type1 == "BYTE") && type2 == "SET"){
+        return;
+    }
+    output::errorMismatch(yylineno);
+    exit(0);
+}
+
+void check_valid_relop(string type1, string type2){
+    if((type1 == "INT" || type1 == "BYTE") && (type2 == "INT" || type2 == "BYTE")){
+        return;
+    }
+    output::errorMismatch(yylineno);
+    exit(0);
 }
