@@ -18,9 +18,10 @@ public:
     string type;
     int offset;
     bool is_function;
+    string ret_type;
 
-    Entry(const string &name, const string &type, int offset, bool is_function=false) : name(name), type(type),
-                                                                offset(offset), is_function(is_function) {}
+    Entry(const string &name, const string &type, int offset, bool is_function=false, const string &ret_type="None") :
+                                    name(name), type(type), offset(offset), is_function(is_function), ret_type(ret_type) {}
 };
 
 class Scope{
@@ -33,20 +34,21 @@ public:
 
     }
 
-    void addEntry(const string& name, const string& type, bool is_function = false){
-        auto* e = new Entry(name, type, max_offset, is_function);
+    void addEntry(const string& name, const string& type, bool is_function = false, const string &ret_type = "None"){
+        auto* e = new Entry(name, type, max_offset, is_function, ret_type);
         entries->push_back(e);
         max_offset++;
     }
 
-    void addEntry(const string& name, const string& type, int offset, bool is_function = false){
-        auto* e = new Entry(name, type, offset);
+    void addEntry(const string& name, const string& type, int offset, bool is_function = false, const string &ret_type = "None"){
+        auto* e = new Entry(name, type, offset, is_function, ret_type);
         entries->push_back(e);
         //We use this to add function parameters to table, so no need to increase max_offset
     }
 
     bool isInScope(const string& id, bool is_function = false){
-        for (Entry* e : *(entries)){
+        //for (Entry* e : *(entries)){
+        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
             if(e->name == id){
                 if (is_function){
                     if(!e->is_function) {
@@ -64,6 +66,14 @@ public:
         return false;
     }
 
+    string getScopeFuncRet(){
+        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
+            if(e->is_function){
+                return e->ret_type;
+            }
+        }
+        return "None";
+    }
 
 };
 
@@ -135,7 +145,7 @@ public:
             args = (FormalsList*)args->next;
         }
         string funcType = output::makeFunctionType(retType, argTypes);
-        table->back()->addEntry(func_name, funcType, 0, true);
+        table->back()->addEntry(func_name, funcType, 0, true, retType);
 
         auto* new_scope = new Scope(max_offset);
         int i = -1;
@@ -160,7 +170,8 @@ public:
     }
     bool isVarDeclared(N* n){
         string name = ((Node*)n)->val;
-        for(Scope* scope : *table){
+        //for(Scope* scope : *table){
+        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
             if(scope->isInScope(name)){
                 return true;
             }
@@ -169,7 +180,8 @@ public:
     }
     bool isFuncDeclared(N* n){
         string name = ((Node*)n)->val;
-        for(Scope* scope : *table){
+        //for(Scope* scope : *table){
+        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
             if(scope->isInScope(name, true)){
                 return true;
             }
@@ -203,8 +215,57 @@ public:
             output::errorMismatch(yylineno);
             exit(0);
         }
-        //TO DO: need to add check that byte or set are in valid range
-        //check if byte or
+        int exp_value = ((Expression*)exp)->number;
+        if(var_type == "BYTE" && exp_type == "BYTE" && exp_value > 255){
+            output::errorByteTooLarge(yylineno, to_string(((Expression*)exp)->number));
+            exit(0);
+        }
+    }
+    void checkCurrFuncVoid(){
+        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+            string ret = scope->getScopeFuncRet();
+            if(ret != "None"){
+                if(ret == "VOID"){
+                    return;
+                }
+                else{
+                    output::errorMismatch(yylineno);
+                    exit(0);
+                }
+            }
+        }
+    }
+    void checkRetType(N* exp){
+        string exp_type = ((Expression*)exp)->type;
+        string ret;
+        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+            ret = scope->getScopeFuncRet();
+            if(ret != "None"){
+                break;
+            }
+        }
+        if(ret == exp_type){
+            return;
+        }
+        else if(ret == "INT" && exp_type == "BYTE"){
+            return;
+        }
+        output::errorMismatch(yylineno);
+        exit(0);
+    }
+    void checkInWhile(bool is_break = false){
+        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope) {
+            if(scope->while_scope){
+                return;
+            }
+        }
+        if(is_break){
+            output::errorUnexpectedBreak(yylineno);
+            exit(0);
+        }
+        else{
+            output::errorUnexpectedContinue(yylineno);
+        }
     }
 
 };

@@ -5,6 +5,9 @@
 #ifndef HW3_PARSER_H
 #define HW3_PARSER_H
 
+#include "hw3_output.hpp"
+extern int yylineno;
+
 #include <string>
 using namespace std;
 
@@ -70,6 +73,12 @@ struct Type_var : public N{
        int e = stoi(End);
        this->start = s;
        this->end = e;
+       if(type == "SET"){
+           if(this->end - this->start >255 || this->end - this->start <= 0){
+               output::errorSetTooLarge(yylineno, start, End);
+               exit(0);
+           }
+       }
     }
 };
 
@@ -83,5 +92,14 @@ struct Expression : public N{
     string op;
     Expression(const string& name = "", const string& type = "", bool bool_value = false, int number = 0, const string& str = "", const string& op = "")
             : name(name), type(type), bool_value(bool_value), number(number), str(str), op(op) {}
+};
+
+struct If_statement : public N{
+    N* condition;
+    N* to_do;
+    N* else_do;
+
+    If_statement(N *condition, N *toDo, N *elseDo = nullptr) : condition(condition), to_do(toDo), else_do(elseDo) {}
+
 };
 #endif //HW3_PARSER_H
