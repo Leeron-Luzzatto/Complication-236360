@@ -6,7 +6,7 @@
 #define HW3_PARSER_H
 
 #include "hw3_output.hpp"
-extern int yylineno;
+
 
 #include <string>
 using namespace std;
@@ -90,8 +90,20 @@ struct Expression : public N{
     int number;
     string str;
     string op;
-    Expression(const string& name = "", const string& type = "", bool bool_value = false, int number = 0, const string& str = "", const string& op = "")
+    Expression(const string& type = "", const string& name = "",  bool bool_value = false, int number = 0, const string& str = "", const string& op = "")
             : name(name), type(type), bool_value(bool_value), number(number), str(str), op(op) {}
+};
+
+struct Exp_list : public N{
+    vector<string> types;
+
+    Exp_list(const string& type){
+        this->types.push_back(type);
+    }
+    void addType(const string& type){
+        this->types.push_back(type);
+    }
+
 };
 
 struct If_statement : public N{
@@ -102,4 +114,7 @@ struct If_statement : public N{
     If_statement(N *condition, N *toDo, N *elseDo = nullptr) : condition(condition), to_do(toDo), else_do(elseDo) {}
 
 };
+
+#define YYSTYPE N*
+
 #endif //HW3_PARSER_H

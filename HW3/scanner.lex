@@ -1,7 +1,7 @@
 %{
+#include "parser.hpp"
 #include "parser.tab.hpp"
-#include "output.hpp"
-#include "parser.h"
+#include "hw3_output.hpp"
 
 %}
 

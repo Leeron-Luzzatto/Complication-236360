@@ -5,7 +5,7 @@
 #ifndef HW3_TABLE_H
 #define HW3_TABLE_H
 #include "hw3_output.hpp"
-#include "parser.h"
+#include "parser.hpp"
 #include <string>
 #include <vector>
 using namespace std;
@@ -267,6 +267,77 @@ public:
             output::errorUnexpectedContinue(yylineno);
         }
     }
-
+    bool checkValidArgs(N* fName, const vector<string>& args){
+        string func_name = ((Node*)fName)->val;
+        int i = 0;
+        for(; i<this->table->size(); i++){
+            Scope* s = (*table)[i];
+            for (Entry* e : *(s->entries)){
+                if(e->is_function && e->name == func_name){
+                    i++;
+                    break;
+                }
+            }
+        }
+        vector<string> function_args_types;
+        for(Entry* e : *((*table)[i])->entries){
+            if(e->offset < 0){
+                function_args_types.push_back(e->type);
+            }
+        }
+       if(function_args_types.size() != args.size()){
+           return false;
+       }
+       for(int j=0; j<function_args_types.size(); j++){
+           if(!checkValidAssign(function_args_types[j], args[j])){
+               output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
+               exit(0);
+           }
+       }
+       return true;
+    }
+    bool checkFuncArgsEmpty(N* fName){
+        string func_name = ((Node*)fName)->val;
+        int i = 0;
+        for(; i<this->table->size(); i++){
+            Scope* s = (*table)[i];
+            for (Entry* e : *(s->entries)){
+                if(e->is_function && e->name == func_name){
+                    i++;
+                    break;
+                }
+            }
+        }
+        vector<string> function_args_types;
+        for(Entry* e : *((*table)[i])->entries){
+            if(e->offset < 0){
+                function_args_types.push_back(e->type);
+            }
+        }
+        if(!function_args_types.empty()) {
+            output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
+            exit(0);
+        }
+        return true;
+    }
+    bool checkValidAssign(const string& type1, const string& type2){
+        if(type1 == type2){
+            return true;
+        }
+        else if(type1 == "INT" && type2 == "BYTE"){
+            return true;
+        }
+        return false;
+    }
+    string getFuncRetType(string func_name){
+        for(int i = 0; i<this->table->size(); i++){
+            Scope* s = (*table)[i];
+            for (Entry* e : *(s->entries)){
+                if(e->is_function && e->name == func_name){
+                    return e->ret_type;
+                }
+            }
+        }
+    }
 };
 #endif //HW3_TABLE_H

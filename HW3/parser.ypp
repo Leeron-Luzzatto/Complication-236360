@@ -3,9 +3,12 @@
     extern int yylineno;
 	void yyerror(const char*);
 	#include "hw3_output.hpp"
-	#include "parser.h"
+	#include "parser.hpp"
 	#include "Table.h"
 	SymbolTable* table;
+	void check_valid_bool(string exp);
+	string MulDivType(string a, string b);
+	string PlusMinusType(string a, string b);
 %}
 
 %right ASSIGN;
@@ -61,7 +64,7 @@ FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4)
                 LBRACE Statements RBRACE{table->ScopeEnd();}
             ;
 
-RetType     :   Type{$$ = $1}   |   VOID{$$ = new Type_var("VOID");}
+RetType     :   Type{$$ = $1;}   |   VOID{$$ = new Type_var("VOID");}
             ;
 
 Formals     :   {$$ = new FormalsList();}   |   FormalsList{$$ = $1;}
@@ -70,10 +73,10 @@ Formals     :   {$$ = new FormalsList();}   |   FormalsList{$$ = $1;}
 FormalsList :   FormalDecl{$$ = new FormalsList();} |   FormalDecl COMMA FormalsList{$$ = new FormalsList($1, $3);}
             ;
 
-FormalDecl :   Type ID{$$ = new Arguments($1, $2);}
+FormalDecl  :   Type ID{$$ = new Argument($1, $2);}
             ;
 
-Statements  :   Statement{$$ = new Statements($1)} |   Statements Statement{$$ = new Statements($2, $1);}
+Statements  :   Statement{$$ = new Statements($1);} |   Statements Statement{$$ = new Statements($2, $1);}
             ;
 
 Statement   :   LBRACE {table->newScope();} Statements RBRACE ExitScope {table->ScopeEnd(); $$ = $2;}  |
@@ -81,12 +84,12 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE ExitScope {table->
                 Type ID ASSIGN Exp SC      {table->addVar($1, $2); table->checkValidAssign($2, $4); $$ = new Argument($1, $2, $4);}  |
                 ID ASSIGN Exp SC           {table->checkValidAssign($1, $3);}  |
                 Call SC                    {$$ = $1;}  |
-                RETURN SC                  {table->checkCurrFuncVoid; }  |
+                RETURN SC                  {table->checkCurrFuncVoid(); }  |
                 RETURN Exp SC              {table->checkRetType($2); }  |
-                IF LPAREN Exp RPAREN EnterScope Statement ExitScope {check_valid_bool($3->type); $$ = new If_statement($3, $6);}  |
+                IF LPAREN Exp RPAREN EnterScope Statement ExitScope {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);}  |
                 IF LPAREN Exp RPAREN EnterScope Statement ExitScope ELSE EnterScope Statement ExitScope
-                                                    {check_valid_bool($3->type); $$ = new If_statement($3, $6, $10);}  |
-                WHILE LPAREN Exp RPAREN EnterWhile Statement ExitScope   {check_valid_bool($3->type); }  |
+                                                    {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $10);}  |
+                WHILE LPAREN Exp RPAREN EnterWhile Statement ExitScope   {check_valid_bool(((Expression*)$3)->type); }  |
                 BREAK SC                   {table->checkInWhile(true);}  |
                 CONTINUE SC                {table->checkInWhile();}
             ;
@@ -97,11 +100,30 @@ EnterWhile  :   {table->newScope(true);}
 
 ExitScope   :   {table->ScopeEnd();}
 
-Call        :   ID LPAREN ExpList RPAREN{output::printProductionRule(26);}  |
-                ID LPAREN RPAREN        {output::printProductionRule(27);}
+Call        :   ID LPAREN ExpList RPAREN{
+                    if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
+                                                 delete $1;
+                                                 delete $3;
+                                                 exit(0);}
+                    table->checkValidArgs($1, ((Exp_list*)$3)->types);
+                    $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
+                    delete $1;
+                    delete $3;
+                }  |
+                ID LPAREN RPAREN        {
+                if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
+                                                                 delete $1;
+                                                                 exit(0);}
+                table->checkFuncArgsEmpty($1);
+                $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
+                delete $1;
+                delete $3;
+
+                }
             ;
 
-ExpList     :   Exp{output::printProductionRule(28);}   |   Exp COMMA ExpList{output::printProductionRule(29);}
+ExpList     :   Exp{$$ = new Exp_list(((Expression*)$1)->type); delete $1;}   |
+                Exp COMMA ExpList{$$ = ((Exp_list*)$3); ((Exp_list*)$$)->addType(((Expression*)$1)->type) ;delete $1;}
             ;
 
 Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYTE");}  |
@@ -110,24 +132,69 @@ Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYT
             ;
 
 Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
-                Exp MULDIV Exp      {string type = MulDivType($1->type, $2->type);
-                                     $$ = new Expression(); $$->type = type;}   |
-                Exp PLUSMINUS Exp   {string type = PlusMinusType($1->type, $2->type);
-                                     $$ = new Expression(); $$->type = type;}   |
-                ID                  {string type = getVarType($1);
-                                     $$ = new Expression(); $$->type = type; $$->name=(((Node*)$1)->val);}   |
-                Call                {output::printProductionRule(37);}   |
-                NUM                 {$$ = new Expression(); $$->type = "INT"; $$->number = stoi((Node*)$1)->val;}   |
-                NUM B               {$$ = new Expression(); $$->type = "BYTE"; $$->number = stoi((Node*)$1)->val;}   |
-                STRING              {$$ = new Expression(); $$->type = "STRING"; $$->str = ((Node*)$1)->val;}   |
-                TRUE                {$$ = new Expression(); $$->type = "BOOL"; $$->bool_value = true;}   |
-                FALSE               {$$ = new Expression(); $$->type = "BOOL"; $$->bool_value = false;}   |
-                NOT Exp             {check_valid_bool($2->type); $$ = new Expression(); $$->type = $2->type;}   |
-                Exp AND Exp         {check_valid_bool($1->type); check_valid_bool($3->type); $$ = new Expression(); $$->type = "BOOL"}   |
-                Exp OR Exp          {check_valid_bool($1->type); check_valid_bool($3->type); $$ = new Expression(); $$->type = "BOOL"}   |
-                Exp RELOPL Exp      {check_valid_relop($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
-                Exp RELOPN Exp      {check_valid_relop($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
-                Exp RELOP_IN Exp    {check_valid_in($1->type, $2->type); $$ = new Expression(); $$->type = "BOOL"}   |
+                Exp MULDIV Exp      {string type = MulDivType(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression(); ((Expression*)$$)->type = type; delete $1; delete $3;}   |
+                Exp PLUSMINUS Exp   {string type = PlusMinusType(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression(type);
+                                     delete $1;
+                                     delete $3;}   |
+                ID                  {string type = table->getVarType($1);
+                                     $$ = new Expression(type);
+                                     $$->name=(((Node*)$1)->val);
+                                     delete $1;}   |
+                Call                {$$ = new Expression();
+                                     $$->type = ((Type_var*)$1)->type;
+                                     delete $1;}   |
+                NUM                 {$$ = new Expression();
+                                     $$->type = "INT";
+                                     $$->number = stoi((Node*)$1)->val;
+                                     delete $1;}   |
+                NUM B               {$$ = new Expression();
+                                     $$->type = "BYTE";
+                                     $$->number = stoi((Node*)$1)->val;
+                                     delete $1;}   |
+                STRING              {$$ = new Expression();
+                                     $$->type = "STRING";
+                                     $$->str = ((Node*)$1)->val;
+                                     delete $1;}   |
+                TRUE                {$$ = new Expression();
+                                     $$->type = "BOOL";
+                                     $$->bool_value = true;
+                                     delete $1;}   |
+                FALSE               {$$ = new Expression();
+                                     $$->type = "BOOL";
+                                     $$->bool_value = false;
+                                     delete $1;}   |
+                NOT Exp             {check_valid_bool($2->type);
+                                     $$ = new Expression();
+                                     $$->type = $2->type;}   |
+                Exp AND Exp         {check_valid_bool($1->type);
+                                    check_valid_bool($3->type);
+                                    $$ = new Expression();
+                                    $$->type = "BOOL";
+                                    delete $1;
+                                    delete $3;}   |
+                Exp OR Exp          {check_valid_bool($1->type);
+                                     check_valid_bool($3->type);
+                                     $$ = new Expression();
+                                     $$->type = "BOOL";
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOPL Exp      {check_valid_relop($1->type, $2->type);
+                                     $$ = new Expression();
+                                     $$->type = "BOOL";
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOPN Exp      {check_valid_relop($1->type, $2->type);
+                                     $$ = new Expression();
+                                     $$->type = "BOOL";
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOP_IN Exp    {check_valid_in($1->type, $2->type);
+                                    $$ = new Expression();
+                                    $$->type = "BOOL";
+                                    delete $1;
+                                    delete $3;}   |
                 LPAREN Type RPAREN Exp  {checkValidCast());
                                          $$ = new Expression(); $$->type = "INT";}
             ;
