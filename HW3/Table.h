@@ -31,7 +31,7 @@ public:
     bool while_scope;
 
     Scope(int maxOffset, bool whileScope = false) : max_offset(maxOffset), while_scope(whileScope) {
-
+        entries = new vector<Entry*>();
     }
 
     void addEntry(const string& name, const string& type, bool is_function = false, const string &ret_type = "None"){
@@ -118,7 +118,9 @@ public:
     void ScopeEnd(){
         output::endScope();
         Scope* s = table->back();
-        for(Entry* e : *(s->entries)){
+//        for(Entry* e : *(s->entries)){
+        for(int i=0; i<s->entries->size(); i++){
+            Entry* e = (*(s->entries))[i];
             output::printID(e->name, e->offset, e->type);
         }
         max_offset-=s->max_offset;
@@ -309,6 +311,9 @@ public:
             }
         }
         vector<string> function_args_types;
+        for(int l=0; l< ((*table)[i])->entries->size() ;l++){
+            Entry* e = (*(((*table)[i])->entries))[l];
+        }
         for(Entry* e : *((*table)[i])->entries){
             if(e->offset < 0){
                 function_args_types.push_back(e->type);
@@ -332,6 +337,9 @@ public:
     string getFuncRetType(string func_name){
         for(int i = 0; i<this->table->size(); i++){
             Scope* s = (*table)[i];
+            for(int j=0; j<(*(s->entries)).size(); j++){
+                Entry* e = (*(s->entries))[j];
+            }
             for (Entry* e : *(s->entries)){
                 if(e->is_function && e->name == func_name){
                     return e->ret_type;

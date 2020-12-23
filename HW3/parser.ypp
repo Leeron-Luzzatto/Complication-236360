@@ -6,9 +6,14 @@
 	#include "parser.hpp"
 	#include "Table.h"
 	SymbolTable* table;
+	#include <string>
+    using namespace std;
 	void check_valid_bool(string exp);
 	string MulDivType(string a, string b);
 	string PlusMinusType(string a, string b);
+	void checkValidCast(string type, string exp_type);
+	void check_valid_relop(string type1, string type2);
+	void check_valid_in(string type1, string type2);
 %}
 
 %right ASSIGN;
@@ -140,69 +145,61 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      delete $3;}   |
                 ID                  {string type = table->getVarType($1);
                                      $$ = new Expression(type);
-                                     $$->name=(((Node*)$1)->val);
                                      delete $1;}   |
-                Call                {$$ = new Expression();
-                                     $$->type = ((Type_var*)$1)->type;
+                Call                {$$ = new Expression(((Type_var*)$1)->type);
                                      delete $1;}   |
-                NUM                 {$$ = new Expression();
-                                     $$->type = "INT";
-                                     $$->number = stoi((Node*)$1)->val;
+                NUM                 {$$ = new Expression("INT");
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      delete $1;}   |
-                NUM B               {$$ = new Expression();
-                                     $$->type = "BYTE";
-                                     $$->number = stoi((Node*)$1)->val;
+                NUM B               {$$ = new Expression("BYTE");
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      delete $1;}   |
-                STRING              {$$ = new Expression();
-                                     $$->type = "STRING";
-                                     $$->str = ((Node*)$1)->val;
+                STRING              {$$ = new Expression("STRING");
+                                     ((Expression*)$$)->str = ((Node*)$1)->val;
                                      delete $1;}   |
-                TRUE                {$$ = new Expression();
-                                     $$->type = "BOOL";
-                                     $$->bool_value = true;
+                TRUE                {$$ = new Expression("BOOL");
+                                     ((Expression*)$$)->bool_value = true;
                                      delete $1;}   |
-                FALSE               {$$ = new Expression();
-                                     $$->type = "BOOL";
-                                     $$->bool_value = false;
+                FALSE               {$$ = new Expression("BOOL");
+                                     ((Expression*)$$)->bool_value = false;
                                      delete $1;}   |
-                NOT Exp             {check_valid_bool($2->type);
+                NOT Exp             {check_valid_bool(((Expression*)$2)->type);
                                      $$ = new Expression();
-                                     $$->type = $2->type;}   |
-                Exp AND Exp         {check_valid_bool($1->type);
-                                    check_valid_bool($3->type);
-                                    $$ = new Expression();
-                                    $$->type = "BOOL";
+                                     ((Expression*)$$)->type = ((Expression*)$2)->type;}   |
+                Exp AND Exp         {check_valid_bool(((Expression*)$1)->type);
+                                    check_valid_bool(((Expression*)$3)->type);
+                                    $$ = new Expression("BOOL");
                                     delete $1;
                                     delete $3;}   |
-                Exp OR Exp          {check_valid_bool($1->type);
-                                     check_valid_bool($3->type);
-                                     $$ = new Expression();
-                                     $$->type = "BOOL";
+                Exp OR Exp          {check_valid_bool(((Expression*)$1)->type);
+                                     check_valid_bool(((Expression*)$3)->type);
+                                     $$ = new Expression("BOOL");
                                      delete $1;
                                      delete $3;}   |
-                Exp RELOPL Exp      {check_valid_relop($1->type, $2->type);
-                                     $$ = new Expression();
-                                     $$->type = "BOOL";
+                Exp RELOPL Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$2)->type);
+                                     $$ = new Expression("BOOL");
                                      delete $1;
                                      delete $3;}   |
-                Exp RELOPN Exp      {check_valid_relop($1->type, $2->type);
-                                     $$ = new Expression();
-                                     $$->type = "BOOL";
+                Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$2)->type);
+                                     $$ = new Expression("BOOL");
                                      delete $1;
                                      delete $3;}   |
-                Exp RELOP_IN Exp    {check_valid_in($1->type, $2->type);
-                                    $$ = new Expression();
-                                    $$->type = "BOOL";
+                Exp RELOP_IN Exp    {check_valid_in(((Expression*)$1)->type,((Expression*)$2)->type);
+                                    $$ = new Expression("BOOL");
                                     delete $1;
                                     delete $3;}   |
-                LPAREN Type RPAREN Exp  {checkValidCast());
-                                         $$ = new Expression(); $$->type = "INT";}
+                LPAREN Type RPAREN Exp  {checkValidCast(((Type_var*)$2)->type, ((Expression*)$4)->type);
+                                         $$ = new Expression("INT");
+                                         }
             ;
 
 %%
 
 int main()
 {
+    #ifdef YYDEBUG
+      yydebug = 1;
+    #endif
 	return yyparse();
 }
 
@@ -254,7 +251,7 @@ string MulDivType(string a, string b){
 }
 
 void check_valid_bool(string exp){
-    if(exp != "BOOL")){
+    if(exp != "BOOL"){
       output::errorMismatch(yylineno);
       exit(0);
    }
