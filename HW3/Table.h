@@ -19,9 +19,14 @@ public:
     int offset;
     bool is_function;
     string ret_type;
+    vector<string> function_args;
+
+    Entry(const string &name, const string &type, int offset, bool isFunction, const string &retType,
+          const vector<string> &functionArgs) : name(name), type(type), offset(offset), is_function(isFunction),
+                                                ret_type(retType), function_args(functionArgs) {}
 
     Entry(const string &name, const string &type, int offset, bool is_function=false, const string &ret_type="None") :
-                                    name(name), type(type), offset(offset), is_function(is_function), ret_type(ret_type) {}
+            name(name), type(type), offset(offset), is_function(is_function), ret_type(ret_type) {}
 };
 
 class Scope{
@@ -40,15 +45,35 @@ public:
         max_offset++;
     }
 
-    void addEntry(const string& name, const string& type, int offset, bool is_function = false, const string &ret_type = "None"){
-        auto* e = new Entry(name, type, offset, is_function, ret_type);
+    void addEntry(const string& name, const string& type, int offset, const vector<string> &functionArgs, bool is_function = false,
+                  const string &ret_type = "None"){
+        auto* e = new Entry(name, type, offset, is_function, ret_type, functionArgs);
         entries->push_back(e);
         //We use this to add function parameters to table, so no need to increase max_offset
     }
 
+    void addFuncVar(const string& name, const string& type, int offset){
+        auto* e = new Entry(name, type, offset, false, "None");
+        entries->push_back(e);
+    }
+
+    void addVar(const string& name, const string& type, int offset){
+        auto* e = new Entry(name, type, offset, false, "None");
+        entries->push_back(e);
+        max_offset++;
+    }
+
     bool isInScope(const string& id, bool is_function = false){
-        //for (Entry* e : *(entries)){
-        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
+//        for (Entry* e : *(entries)){
+//        printf("%d\n",entries->size());
+//        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
+
+//        if(entries == nullptr){
+//            printf("Entris is null...\n");
+//        }
+
+        for(int i=entries->size() - 1; i>=0; i--){
+            Entry* e = (*entries)[i];
             if(e->name == id){
                 if (is_function){
                     if(!e->is_function) {
@@ -67,7 +92,9 @@ public:
     }
 
     string getScopeFuncRet(){
-        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
+//        for (auto e = *(entries)->rbegin(); e!=*(entries)->rend();++e){
+        for(int i = entries->size()-1; i>=0; i--){
+            Entry* e = (*entries)[i];
             if(e->is_function){
                 return e->ret_type;
             }
@@ -92,13 +119,13 @@ public:
         string retType = "VOID";
         vector<string> argTypes = {"STRING"};
         string funcType = output::makeFunctionType(retType, argTypes);
-        global->addEntry(name, funcType, 0, true);
+        global->addEntry(name, funcType, 0, argTypes, true, retType);
 
         //add printi
         name = "printi";
         argTypes = {"INT"};
         funcType = output::makeFunctionType(retType, argTypes);
-        global->addEntry(name, funcType, 0, true);
+        global->addEntry(name, funcType, 0, argTypes, true, retType);
 
         table->push_back(global);
     }
@@ -109,15 +136,6 @@ public:
         }
         output::endScope();
         Scope* s = table->back();
-        for(Entry* e : *(s->entries)){
-            output::printID(e->name, e->offset, e->type);
-        }
-        max_offset-=s->max_offset;
-        table->pop_back();
-    }
-    void ScopeEnd(){
-        output::endScope();
-        Scope* s = table->back();
 //        for(Entry* e : *(s->entries)){
         for(int i=0; i<s->entries->size(); i++){
             Entry* e = (*(s->entries))[i];
@@ -126,7 +144,21 @@ public:
         max_offset-=s->max_offset;
         table->pop_back();
     }
+    void ScopeEnd(){
+        output::endScope();
+        Scope* s = table->back();
+        for(int i=0; i<s->entries->size(); i++){
+            Entry* e = (*(s->entries))[i];
+            output::printID(e->name, e->offset, e->type);
+        }
+        max_offset-=s->max_offset;
+        table->pop_back();
+    }
     void addFunction(N* rT, N* n, N* aT){
+        if(isVarDeclared(n) || isFuncDeclared(n)){
+            output::errorDef(yylineno, ((Node*)n)->val);
+            exit(0);
+        }
         string func_name = ((Node*)n)->val;
         string retType = ((Type_var*)rT)->type;
         FormalsList* args = ((FormalsList*)aT);
@@ -140,19 +172,21 @@ public:
         vector<string> argNames = vector<string>();
 
         while(args!= nullptr){
-            string var_type = ((Node*)(((Argument*)args)->type))->val;
+            string var_type = ((Type_var*)(((Argument*)(args->arg))->type))->type;
             argTypes.push_back(var_type);
-            string var_name = ((Node*)(((Argument*)args)->name))->val;
+            string var_name = ((Node*)(((Argument*)(args->arg))->name))->val;
+
+
             argNames.push_back(var_name);
             args = (FormalsList*)args->next;
         }
         string funcType = output::makeFunctionType(retType, argTypes);
-        table->back()->addEntry(func_name, funcType, 0, true, retType);
+        table->back()->addEntry(func_name, funcType, 0, argTypes, true, retType);
 
         auto* new_scope = new Scope(max_offset);
         int i = -1;
         for (int j=0; j<argNames.size(); j++){
-            new_scope->addEntry(argNames[j], argTypes[j], i);
+            new_scope->addFuncVar(argNames[j], argTypes[j], i);
             i--;
         }
         table->push_back(new_scope);
@@ -163,17 +197,19 @@ public:
             output::errorDef(yylineno, ((Node*)name)->val);
             exit(0);
         }
-        scope->addEntry(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
+        scope->addVar(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
         max_offset++;
     }
     void newScope(bool is_while = false){
-        auto* scope = new Scope(max_offset, is_while);
+        Scope* scope = new Scope(max_offset, is_while);
         table->push_back(scope);
     }
     bool isVarDeclared(N* n){
         string name = ((Node*)n)->val;
         //for(Scope* scope : *table){
-        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+//        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
             if(scope->isInScope(name)){
                 return true;
             }
@@ -183,7 +219,8 @@ public:
     bool isFuncDeclared(N* n){
         string name = ((Node*)n)->val;
         //for(Scope* scope : *table){
-        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
             if(scope->isInScope(name, true)){
                 return true;
             }
@@ -197,8 +234,10 @@ public:
             exit(0);
         }
         //We know variable exits
-        for(Scope* scope : *table){
-            for(Entry* e : *(scope->entries)){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
+            for(int j=0; j<scope->entries->size(); j++){
+                Entry* e = (*(scope->entries))[j];
                 if(e->name == name){
                     //Found it, return type
                     return e->type;
@@ -224,7 +263,8 @@ public:
         }
     }
     void checkCurrFuncVoid(){
-        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
             string ret = scope->getScopeFuncRet();
             if(ret != "None"){
                 if(ret == "VOID"){
@@ -240,7 +280,8 @@ public:
     void checkRetType(N* exp){
         string exp_type = ((Expression*)exp)->type;
         string ret;
-        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
             ret = scope->getScopeFuncRet();
             if(ret != "None"){
                 break;
@@ -256,7 +297,8 @@ public:
         exit(0);
     }
     void checkInWhile(bool is_break = false){
-        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope) {
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
             if(scope->while_scope){
                 return;
             }
@@ -274,36 +316,31 @@ public:
         int i = 0;
         for(; i<this->table->size(); i++){
             Scope* s = (*table)[i];
-            for (Entry* e : *(s->entries)){
+            for(int j=0; j<s->entries->size(); j++){
+                Entry* e = (*(s->entries))[j];
                 if(e->is_function && e->name == func_name){
-                    i++;
-                    break;
+                    vector<string> function_args_types = e->function_args;
+                    if(function_args_types.size() != args.size()){
+                        return false;
+                    }
+                    for(int l=0; l<function_args_types.size(); l++){
+                        if(!checkValidAssign(function_args_types[l], args[l])){
+                            output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
+                            exit(0);
+                        }
+                    }
+                    return true;
                 }
             }
         }
-        vector<string> function_args_types;
-        for(Entry* e : *((*table)[i])->entries){
-            if(e->offset < 0){
-                function_args_types.push_back(e->type);
-            }
-        }
-       if(function_args_types.size() != args.size()){
-           return false;
-       }
-       for(int j=0; j<function_args_types.size(); j++){
-           if(!checkValidAssign(function_args_types[j], args[j])){
-               output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
-               exit(0);
-           }
-       }
-       return true;
     }
     bool checkFuncArgsEmpty(N* fName){
         string func_name = ((Node*)fName)->val;
         int i = 0;
         for(; i<this->table->size(); i++){
             Scope* s = (*table)[i];
-            for (Entry* e : *(s->entries)){
+            for(int j=0; j<(*(s->entries)).size(); j++){
+                Entry* e = (*(s->entries))[j];
                 if(e->is_function && e->name == func_name){
                     i++;
                     break;
@@ -313,8 +350,6 @@ public:
         vector<string> function_args_types;
         for(int l=0; l< ((*table)[i])->entries->size() ;l++){
             Entry* e = (*(((*table)[i])->entries))[l];
-        }
-        for(Entry* e : *((*table)[i])->entries){
             if(e->offset < 0){
                 function_args_types.push_back(e->type);
             }
@@ -339,8 +374,6 @@ public:
             Scope* s = (*table)[i];
             for(int j=0; j<(*(s->entries)).size(); j++){
                 Entry* e = (*(s->entries))[j];
-            }
-            for (Entry* e : *(s->entries)){
                 if(e->is_function && e->name == func_name){
                     return e->ret_type;
                 }

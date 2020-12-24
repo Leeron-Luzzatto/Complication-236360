@@ -8,27 +8,15 @@
 	SymbolTable* table;
 	#include <string>
     using namespace std;
-	void check_valid_bool(string exp);
-	string MulDivType(string a, string b);
-	string PlusMinusType(string a, string b);
-	void checkValidCast(string type, string exp_type);
-	void check_valid_relop(string type1, string type2);
-	void check_valid_in(string type1, string type2);
+    void check_valid_bool(const string &exp);
+    string MulDivType(const string &a, const string &b);
+    string PlusMinusType(const string &a, const string &b);
+    void checkValidCast(const string &type, const string &exp_type);
+    void check_valid_in(const string &type1, const string &type2);
+    void check_valid_relop(const string &type1, const string &type2);
 %}
 
-%right ASSIGN;
-%left OR;
-%left AND;
-%left RELOPL;
-%nonassoc RELOPN;
-%nonassoc RELOP_IN;
-%left PLUSMINUS
-%left MULDIV;
-%left RPAREN;
-%left RBRACKET;
-%left LBRACKET;
-%left LPAREN;
-
+%nonassoc ID;
 %nonassoc VOID;
 %nonassoc INT;
 %nonassoc BYTE;
@@ -44,11 +32,22 @@
 %nonassoc SC;
 %nonassoc COMMA;
 %nonassoc DOTS;
-%nonassoc ID;
 %nonassoc NUM;
 %nonassoc STRING;
 %nonassoc LBRACE;
 %nonassoc RBRACE;
+%right ASSIGN;
+%left OR;
+%left AND;
+%left RELOPL;
+%nonassoc RELOPN;
+%nonassoc RELOP_IN;
+%left PLUSMINUS
+%left MULDIV;
+%left RPAREN;
+%left RBRACKET;
+%left LBRACKET;
+%left LPAREN;
 
 
 %right IF;
@@ -72,10 +71,12 @@ FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4)
 RetType     :   Type{$$ = $1;}   |   VOID{$$ = new Type_var("VOID");}
             ;
 
-Formals     :   {$$ = new FormalsList();}   |   FormalsList{$$ = $1;}
+Formals     :   {$$ = new FormalsList();}   |
+                 FormalsList{$$ = $1;}
             ;
 
-FormalsList :   FormalDecl{$$ = new FormalsList();} |   FormalDecl COMMA FormalsList{$$ = new FormalsList($1, $3);}
+FormalsList :   FormalDecl{$$ = new FormalsList($1);} |
+                FormalDecl COMMA FormalsList{$$ = new FormalsList($1, $3);}
             ;
 
 FormalDecl  :   Type ID{$$ = new Argument($1, $2);}
@@ -91,9 +92,10 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE ExitScope {table->
                 Call SC                    {$$ = $1;}  |
                 RETURN SC                  {table->checkCurrFuncVoid(); }  |
                 RETURN Exp SC              {table->checkRetType($2); }  |
-                IF LPAREN Exp RPAREN EnterScope Statement ExitScope {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);}  |
-                IF LPAREN Exp RPAREN EnterScope Statement ExitScope ELSE EnterScope Statement ExitScope
-                                                    {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $10);}  |
+                IF LPAREN Exp RPAREN EnterScope Statement
+                        {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);table->ScopeEnd();}  |
+                IF LPAREN Exp RPAREN EnterScope Statement ELSE EnterScope Statement ExitScope
+                         {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $10);table->ScopeEnd();}  |
                 WHILE LPAREN Exp RPAREN EnterWhile Statement ExitScope   {check_valid_bool(((Expression*)$3)->type); }  |
                 BREAK SC                   {table->checkInWhile(true);}  |
                 CONTINUE SC                {table->checkInWhile();}
@@ -152,8 +154,7 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      delete $1;}   |
                 NUM B               {$$ = new Expression("BYTE");
-                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);
-                                     delete $1;}   |
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);}   |
                 STRING              {$$ = new Expression("STRING");
                                      ((Expression*)$$)->str = ((Node*)$1)->val;
                                      delete $1;}   |
@@ -180,7 +181,7 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      $$ = new Expression("BOOL");
                                      delete $1;
                                      delete $3;}   |
-                Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$2)->type);
+                Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
                                      delete $1;
                                      delete $3;}   |
@@ -197,9 +198,6 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
 
 int main()
 {
-    #ifdef YYDEBUG
-      yydebug = 1;
-    #endif
 	return yyparse();
 }
 
@@ -209,14 +207,14 @@ void yyerror(const char * message)
 	exit(0);
 }
 
-void checkValidCast(string type, string exp_type){
+void checkValidCast(const string &type, const string &exp_type){
     if(exp_type != "SET" || type != "INT"){
         output::errorMismatch(yylineno);
         exit(0);
     }
 }
 
-string PlusMinusType(string a, string b){
+string PlusMinusType(const string &a, const string &b){
    if(a == b){
         //both have same type
         return a;
@@ -238,7 +236,7 @@ string PlusMinusType(string a, string b){
    exit(0);
 }
 
-string MulDivType(string a, string b){
+string MulDivType(const string &a, const string &b){
    if(a == b){
         //both have same type
         return a;
@@ -250,14 +248,14 @@ string MulDivType(string a, string b){
    exit(0);
 }
 
-void check_valid_bool(string exp){
+void check_valid_bool(const string &exp){
     if(exp != "BOOL"){
       output::errorMismatch(yylineno);
       exit(0);
    }
 }
 
-void check_valid_in(string type1, string type2){
+void check_valid_in(const string &type1, const string &type2){
     if((type1 == "INT" || type1 == "BYTE") && type2 == "SET"){
         return;
     }
@@ -265,7 +263,7 @@ void check_valid_in(string type1, string type2){
     exit(0);
 }
 
-void check_valid_relop(string type1, string type2){
+void check_valid_relop(const string &type1, const string &type2){
     if((type1 == "INT" || type1 == "BYTE") && (type2 == "INT" || type2 == "BYTE")){
         return;
     }

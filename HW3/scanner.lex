@@ -39,7 +39,7 @@ continue                              {yylval = new Node(yytext); return CONTINU
 (\])                                  {yylval = new Node(yytext); return RBRACKET;}
 (\=)                                  {yylval = new Node(yytext); return ASSIGN;}
 (==|!=)                               {yylval = new Node(yytext); return RELOPL;}
-(>=|>|<|<=|in)                        {yylval = new Node(yytext); return RELOPN;}
+(>=|>|<|<=)                           {yylval = new Node(yytext); return RELOPN;}
 "in"                                  {yylval = new Node(yytext); return RELOP_IN;}
 (\+|\-)                               {yylval = new Node(yytext); return PLUSMINUS;}
 (\*|\/)                               {yylval = new Node(yytext); return MULDIV;}
