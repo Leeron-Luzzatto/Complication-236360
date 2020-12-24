@@ -173,10 +173,8 @@ public:
 
         while(args!= nullptr){
             string var_type = ((Type_var*)(((Argument*)(args->arg))->type))->type;
-            argTypes.push_back(var_type);
+            argTypes.insert(argTypes.begin(), var_type);
             string var_name = ((Node*)(((Argument*)(args->arg))->name))->val;
-
-
             argNames.push_back(var_name);
             args = (FormalsList*)args->next;
         }
@@ -305,11 +303,11 @@ public:
         }
         if(is_break){
             output::errorUnexpectedBreak(yylineno);
-            exit(0);
         }
         else{
             output::errorUnexpectedContinue(yylineno);
         }
+        exit(0);
     }
     bool checkValidArgs(N* fName, const vector<string>& args){
         string func_name = ((Node*)fName)->val;
@@ -321,9 +319,11 @@ public:
                 if(e->is_function && e->name == func_name){
                     vector<string> function_args_types = e->function_args;
                     if(function_args_types.size() != args.size()){
-                        return false;
+                        output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
+                        exit(0);
                     }
                     for(int l=0; l<function_args_types.size(); l++){
+
                         if(!checkValidAssign(function_args_types[l], args[l])){
                             output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
                             exit(0);
@@ -342,23 +342,15 @@ public:
             for(int j=0; j<(*(s->entries)).size(); j++){
                 Entry* e = (*(s->entries))[j];
                 if(e->is_function && e->name == func_name){
-                    i++;
-                    break;
+                    vector<string> function_args_types = e->function_args;
+                    if(!function_args_types.empty()) {
+                        output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
+                        exit(0);
+                    }
+                    return true;
                 }
             }
         }
-        vector<string> function_args_types;
-        for(int l=0; l< ((*table)[i])->entries->size() ;l++){
-            Entry* e = (*(((*table)[i])->entries))[l];
-            if(e->offset < 0){
-                function_args_types.push_back(e->type);
-            }
-        }
-        if(!function_args_types.empty()) {
-            output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
-            exit(0);
-        }
-        return true;
     }
     bool checkValidAssign(const string& type1, const string& type2){
         if(type1 == type2){

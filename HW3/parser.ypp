@@ -60,6 +60,7 @@ Program     :   M Funcs{$$ = $1; table->FinalScopeEnd();}
             ;
 
 M           :   {table = new SymbolTable();}
+            ;
 
 Funcs       :   {$$ = new Funcs();}   |   FuncDecl Funcs{$$ = new Funcs();}
             ;
@@ -85,7 +86,7 @@ FormalDecl  :   Type ID{$$ = new Argument($1, $2);}
 Statements  :   Statement{$$ = new Statements($1);} |   Statements Statement{$$ = new Statements($2, $1);}
             ;
 
-Statement   :   LBRACE {table->newScope();} Statements RBRACE ExitScope {table->ScopeEnd(); $$ = $2;}  |
+Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd(); $$ = $2;}  |
                 Type ID SC                 {table->addVar($1, $2); $$ = new Argument($1, $2);}  |
                 Type ID ASSIGN Exp SC      {table->addVar($1, $2); table->checkValidAssign($2, $4); $$ = new Argument($1, $2, $4);}  |
                 ID ASSIGN Exp SC           {table->checkValidAssign($1, $3);}  |
@@ -96,7 +97,7 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE ExitScope {table->
                         {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);table->ScopeEnd();}  |
                 IF LPAREN Exp RPAREN EnterScope Statement ELSE EnterScope Statement ExitScope
                          {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $10);table->ScopeEnd();}  |
-                WHILE LPAREN Exp RPAREN EnterWhile Statement ExitScope   {check_valid_bool(((Expression*)$3)->type); }  |
+                WHILE LPAREN Exp RPAREN EnterWhile Statement {check_valid_bool(((Expression*)$3)->type); table->ScopeEnd();}  |
                 BREAK SC                   {table->checkInWhile(true);}  |
                 CONTINUE SC                {table->checkInWhile();}
             ;

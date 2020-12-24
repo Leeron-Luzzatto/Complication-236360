@@ -69,19 +69,18 @@ struct Type_var : public N{
     int end;
 
     Type_var(const string &type = "", const string &start = "0", const string &End= "0") : type(type) {
-       int s = stoi(start);
-       int e = stoi(End);
-       this->start = s;
-       this->end = e;
-       if(type == "SET"){
-           if(this->end - this->start >255 || this->end - this->start <= 0){
-               output::errorSetTooLarge(yylineno, start, End);
-               exit(0);
-           }
-       }
+        int s = stoi(start);
+        int e = stoi(End);
+        this->start = s;
+        this->end = e;
+        if(type == "SET"){
+            if(this->end - this->start >255 || this->end - this->start <= 0){
+                output::errorSetTooLarge(yylineno, start, End);
+                exit(0);
+            }
+        }
     }
 };
-
 
 struct Expression : public N{
     string name;
