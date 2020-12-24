@@ -41,18 +41,35 @@ struct Funcs : public N{
 };
 
 struct FormalsList : public N{
-    N* arg;
-    N* next;
+    vector<string> types;
+    vector<string> names;
 
-    FormalsList(N* arg = nullptr, N* next = nullptr) : arg(arg), next(next) {}
+    FormalsList(const string& type, const string& name){
+//        printf("Pushed %s %s\n", name.c_str(), type.c_str());
+
+        this->types.push_back(type);
+        this->names.push_back(name);
+    }
+
+    FormalsList() = default;
+
+    void addType(const string& type, const string& name){
+//        printf("Pushed %s %s\n", name.c_str(), type.c_str());
+
+        types.insert(types.begin(), type);
+        names.insert(names.begin(), name);
+
+//        this->types.push_back(type);
+//        this->names.push_back(name);
+    }
 };
 
 struct Argument : public N{
-    N* type;
-    N* name;
+    string type;
+    string name;
     N* value;
 
-    Argument(N* type, N* name, N* value = nullptr) : type(type), name(name), value(value) {}
+    Argument(const string& type, const string& name, N* value = nullptr) : type(type), name(name), value(value) {}
 };
 
 struct Statements : public N{

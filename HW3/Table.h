@@ -162,22 +162,14 @@ public:
         string func_name = ((Node*)n)->val;
         string retType = ((Type_var*)rT)->type;
         FormalsList* args = ((FormalsList*)aT);
-        args->arg == nullptr ? args = nullptr : args = args;
 
-        if (func_name == "main" && retType == "VOID" && args == nullptr){
+        vector<string> argTypes = args->types;
+        vector<string> argNames = args->names;
+
+        if (func_name == "main" && retType == "VOID" && argTypes.empty()){
             main_found = true;
         }
 
-        vector<string> argTypes = vector<string>();
-        vector<string> argNames = vector<string>();
-
-        while(args!= nullptr){
-            string var_type = ((Type_var*)(((Argument*)(args->arg))->type))->type;
-            argTypes.insert(argTypes.begin(), var_type);
-            string var_name = ((Node*)(((Argument*)(args->arg))->name))->val;
-            argNames.push_back(var_name);
-            args = (FormalsList*)args->next;
-        }
         string funcType = output::makeFunctionType(retType, argTypes);
         table->back()->addEntry(func_name, funcType, 0, argTypes, true, retType);
 
@@ -324,7 +316,9 @@ public:
                     }
                     for(int l=0; l<function_args_types.size(); l++){
 
-                        if(!checkValidAssign(function_args_types[l], args[l])){
+//                        printf("%s %s\n", function_args_types[l].c_str(), args[args.size()-l-1].c_str());
+
+                        if(!checkValidAssign(function_args_types[l], args[args.size()-l-1])){
                             output::errorPrototypeMismatch(yylineno, func_name, function_args_types);
                             exit(0);
                         }
