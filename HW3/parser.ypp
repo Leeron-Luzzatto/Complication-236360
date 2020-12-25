@@ -14,6 +14,7 @@
     void checkValidCast(const string &type, const string &exp_type);
     void check_valid_in(const string &type1, const string &type2);
     void check_valid_relop(const string &type1, const string &type2);
+    void checkValidByte(int val);
 %}
 
 %nonassoc ID;
@@ -155,7 +156,8 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                 NUM                 {$$ = new Expression("INT");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      delete $1;}   |
-                NUM B               {$$ = new Expression("BYTE");
+                NUM B               {checkValidByte(stoi(((Node*)$1)->val));
+                                     $$ = new Expression("BYTE");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);}   |
                 STRING              {$$ = new Expression("STRING");
                                      ((Expression*)$$)->str = ((Node*)$1)->val;
@@ -217,11 +219,20 @@ void checkValidCast(const string &type, const string &exp_type){
     }
 }
 
+void checkValidByte(int val){
+    if(val > 255){
+        output::errorByteTooLarge(yylineno, to_string(val));
+        exit(0);
+    }
+}
+
 string PlusMinusType(const string &a, const string &b){
-   if(a == b){
-        //both have same type
-        return a;
-   }
+    if(a == "INT" && b == "INT"){
+        return "INT";
+    }
+    if(a == "BYTE" && b == "BYTE"){
+        return "BYTE";
+    }
    if(a == "INT" && b == "BYTE" || b == "INT" && a == "BYTE"){
         return "INT";
    }
@@ -240,10 +251,12 @@ string PlusMinusType(const string &a, const string &b){
 }
 
 string MulDivType(const string &a, const string &b){
-   if(a == b){
-        //both have same type
-        return a;
-   }
+    if(a == "INT" && b == "INT"){
+        return "INT";
+    }
+    if(a == "BYTE" && b == "BYTE"){
+        return "BYTE";
+    }
    if(a == "INT" && b == "BYTE" || b == "INT" && a == "BYTE"){
         return "INT";
    }

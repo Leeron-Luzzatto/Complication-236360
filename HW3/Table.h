@@ -43,6 +43,8 @@ public:
         auto* e = new Entry(name, type, max_offset, is_function, ret_type);
         entries->push_back(e);
         max_offset++;
+
+//        printf("Offset increased to %d by %s\n", max_offset, name.c_str());
     }
 
     void addEntry(const string& name, const string& type, int offset, const vector<string> &functionArgs, bool is_function = false,
@@ -61,6 +63,8 @@ public:
         auto* e = new Entry(name, type, offset, false, "None");
         entries->push_back(e);
         max_offset++;
+
+//        printf("Offset increased to %d by %s\n", max_offset, name.c_str());
     }
 
     bool isInScope(const string& id, bool is_function = false){
@@ -150,8 +154,15 @@ public:
         for(int i=0; i<s->entries->size(); i++){
             Entry* e = (*(s->entries))[i];
             output::printID(e->name, e->offset, e->type);
+            if(e->offset >= 0){
+                max_offset--;
+            }
+
         }
-        max_offset-=s->max_offset;
+//        max_offset-=s->max_offset;
+
+//        printf("Global offset deacreased to %d\n", max_offset);
+
         table->pop_back();
     }
     void addFunction(N* rT, N* n, N* aT){
@@ -176,6 +187,10 @@ public:
         auto* new_scope = new Scope(max_offset);
         int i = -1;
         for (int j=0; j<argNames.size(); j++){
+            if(isVarDeclared(argNames[j]) || isFuncDeclared(argNames[j])){
+                output::errorDef(yylineno, argNames[j]);
+                exit(0);
+            }
             new_scope->addFuncVar(argNames[j], argTypes[j], i);
             i--;
         }
@@ -189,6 +204,8 @@ public:
         }
         scope->addVar(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
         max_offset++;
+
+//        printf("Global offset increased to %d by %s\n", max_offset, ((Node*)name)->val.c_str());
     }
     void newScope(bool is_while = false){
         Scope* scope = new Scope(max_offset, is_while);
@@ -208,6 +225,27 @@ public:
     }
     bool isFuncDeclared(N* n){
         string name = ((Node*)n)->val;
+        //for(Scope* scope : *table){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
+            if(scope->isInScope(name, true)){
+                return true;
+            }
+        }
+        return false;
+    }
+    bool isVarDeclared(const string& name){
+        //for(Scope* scope : *table){
+//        for(auto scope = *(table)->rbegin(); scope != *(table)->rend(); ++scope){
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
+            if(scope->isInScope(name)){
+                return true;
+            }
+        }
+        return false;
+    }
+    bool isFuncDeclared(const string& name){
         //for(Scope* scope : *table){
         for(int i=table->size() - 1; i>=0; i--){
             Scope* scope = (*table)[i];
