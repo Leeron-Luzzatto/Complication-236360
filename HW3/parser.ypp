@@ -16,7 +16,7 @@
     void check_valid_relop(const string &type1, const string &type2);
     void checkValidByte(int val);
 %}
-
+%nonassoc x;
 %nonassoc ID;
 %nonassoc VOID;
 %nonassoc INT;
@@ -57,7 +57,7 @@
 
 %%
 
-Program     :   M Funcs{$$ = $1; table->FinalScopeEnd();}
+Program     :   M Funcs x{$$ = $1; table->FinalScopeEnd(); exit(0);}
             ;
 
 M           :   {table = new SymbolTable();}
@@ -107,8 +107,6 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
 EnterScope  :   {table->newScope();}
 
 EnterWhile  :   {table->newScope(true);}
-
-ExitScope   :   {table->ScopeEnd();}
 
 Call        :   ID LPAREN ExpList RPAREN{
                     if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
