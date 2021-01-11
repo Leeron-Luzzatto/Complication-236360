@@ -1,0 +1,286 @@
+%{
+	extern int yylex();
+    extern int yylineno;
+	void yyerror(const char*);
+	#include "hw3_output.hpp"
+	#include "parser.hpp"
+	#include "Table.h"
+	SymbolTable* table;
+	#include <string>
+    using namespace std;
+    void check_valid_bool(const string &exp);
+    string MulDivType(const string &a, const string &b);
+    string PlusMinusType(const string &a, const string &b);
+    void checkValidCast(const string &type, const string &exp_type);
+    void check_valid_in(const string &type1, const string &type2);
+    void check_valid_relop(const string &type1, const string &type2);
+    void checkValidByte(int val);
+%}
+%nonassoc x;
+%nonassoc ID;
+%nonassoc VOID;
+%nonassoc INT;
+%nonassoc BYTE;
+%nonassoc B;
+%nonassoc BOOL;
+%nonassoc SET;
+%nonassoc TRUE;
+%nonassoc FALSE;
+%nonassoc RETURN;
+%nonassoc WHILE;
+%nonassoc BREAK;
+%nonassoc CONTINUE;
+%nonassoc SC;
+%nonassoc COMMA;
+%nonassoc DOTS;
+%nonassoc NUM;
+%nonassoc STRING;
+%nonassoc LBRACE;
+%nonassoc RBRACE;
+%right ASSIGN;
+%left OR;
+%left AND;
+%left RELOPL;
+%nonassoc RELOPN;
+%nonassoc RELOP_IN;
+%left PLUSMINUS
+%left MULDIV;
+%left RPAREN;
+%left RBRACKET;
+%left LBRACKET;
+%left LPAREN;
+
+
+%right IF;
+%right ELSE;
+%right NOT;
+
+%%
+
+Program     :   M Funcs x{$$ = $1; table->FinalScopeEnd(); exit(0);}
+            ;
+
+M           :   {table = new SymbolTable();}
+            ;
+
+Funcs       :   {$$ = new Funcs();}   |   FuncDecl Funcs{$$ = new Funcs();}
+            ;
+
+FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4);}
+                LBRACE Statements RBRACE{table->ScopeEnd();}
+            ;
+
+RetType     :   Type{$$ = $1;}   |   VOID{$$ = new Type_var("VOID");}
+            ;
+
+Formals     :   {$$ = new FormalsList();}   |
+                 FormalsList{$$ = $1;}
+            ;
+
+FormalsList :   FormalDecl{$$ = new FormalsList(((Argument*)$1)->type, ((Argument*)$1)->name);} |
+                FormalDecl COMMA FormalsList
+                    {$$ = ((FormalsList*)$3); ((FormalsList*)$$)->addType(((Argument*)$1)->type, ((Argument*)$1)->name); delete $1;}
+            ;
+
+FormalDecl  :   Type ID{$$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val);}
+            ;
+
+Statements  :   Statement{$$ = new Statements($1);} |   Statements Statement{$$ = new Statements($2, $1);}
+            ;
+
+Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd(); $$ = $2;}  |
+                Type ID SC                 {table->addVar($1, $2); $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val);}  |
+                Type ID ASSIGN Exp SC      {table->addVar($1, $2); table->checkValidAssign($2, $4); $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val, $4);}  |
+                ID ASSIGN Exp SC           {table->checkValidAssign($1, $3);}  |
+                Call SC                    {$$ = $1;}  |
+                RETURN SC                  {table->checkCurrFuncVoid(); }  |
+                RETURN Exp SC              {table->checkRetType($2); }  |
+                IF LPAREN Exp RPAREN EnterScope Statement
+                        {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);table->ScopeEnd();}  |
+                IF LPAREN Exp RPAREN EnterScope Statement ELSE {table->ScopeEnd();table->newScope();} Statement
+                         {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $9);table->ScopeEnd();}  |
+                WHILE LPAREN Exp RPAREN EnterWhile Statement {check_valid_bool(((Expression*)$3)->type); table->ScopeEnd();}  |
+                BREAK SC                   {table->checkInWhile(true);}  |
+                CONTINUE SC                {table->checkInWhile();}
+            ;
+
+EnterScope  :   {table->newScope();}
+
+EnterWhile  :   {table->newScope(true);}
+
+Call        :   ID LPAREN ExpList RPAREN{
+                    if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
+                                                 delete $1;
+                                                 delete $3;
+                                                 exit(0);}
+                    table->checkValidArgs($1, ((Exp_list*)$3)->types);
+                    $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
+                    delete $1;
+                    delete $3;
+                }  |
+                ID LPAREN RPAREN        {
+                if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
+                                                                 delete $1;
+                                                                 exit(0);}
+                table->checkFuncArgsEmpty($1);
+                $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
+                delete $1;
+                delete $3;
+
+                }
+            ;
+
+ExpList     :   Exp{$$ = new Exp_list(((Expression*)$1)->type); delete $1;}   |
+                Exp COMMA ExpList{$$ = ((Exp_list*)$3); ((Exp_list*)$$)->addType(((Expression*)$1)->type) ;delete $1;}
+            ;
+
+Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYTE");}  |
+                BOOL{$$ = new Type_var("BOOL");}  |
+                SET LBRACKET NUM DOTS NUM RBRACKET{$$ = new Type_var("SET", ((Node*)$3)->val, ((Node*)$5)->val);}
+            ;
+
+Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
+                Exp MULDIV Exp      {string type = MulDivType(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression(); ((Expression*)$$)->type = type; delete $1; delete $3;}   |
+                Exp PLUSMINUS Exp   {string type = PlusMinusType(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression(type);
+                                     delete $1;
+                                     delete $3;}   |
+                ID                  {string type = table->getVarType($1);
+                                     $$ = new Expression(type);
+                                     delete $1;}   |
+                Call                {$$ = new Expression(((Type_var*)$1)->type);
+                                     delete $1;}   |
+                NUM                 {$$ = new Expression("INT");
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);
+                                     delete $1;}   |
+                NUM B               {checkValidByte(stoi(((Node*)$1)->val));
+                                     $$ = new Expression("BYTE");
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);}   |
+                STRING              {$$ = new Expression("STRING");
+                                     ((Expression*)$$)->str = ((Node*)$1)->val;
+                                     delete $1;}   |
+                TRUE                {$$ = new Expression("BOOL");
+                                     ((Expression*)$$)->bool_value = true;
+                                     delete $1;}   |
+                FALSE               {$$ = new Expression("BOOL");
+                                     ((Expression*)$$)->bool_value = false;
+                                     delete $1;}   |
+                NOT Exp             {check_valid_bool(((Expression*)$2)->type);
+                                     $$ = new Expression();
+                                     ((Expression*)$$)->type = ((Expression*)$2)->type;}   |
+                Exp AND Exp         {check_valid_bool(((Expression*)$1)->type);
+                                    check_valid_bool(((Expression*)$3)->type);
+                                    $$ = new Expression("BOOL");
+                                    delete $1;
+                                    delete $3;}   |
+                Exp OR Exp          {check_valid_bool(((Expression*)$1)->type);
+                                     check_valid_bool(((Expression*)$3)->type);
+                                     $$ = new Expression("BOOL");
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOPL Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression("BOOL");
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
+                                     $$ = new Expression("BOOL");
+                                     delete $1;
+                                     delete $3;}   |
+                Exp RELOP_IN Exp    {check_valid_in(((Expression*)$1)->type,((Expression*)$3)->type);
+                                    $$ = new Expression("BOOL");
+                                    delete $1;
+                                    delete $3;}   |
+                LPAREN Type RPAREN Exp  {checkValidCast(((Type_var*)$2)->type, ((Expression*)$4)->type);
+                                         $$ = new Expression("INT");
+                                         }
+            ;
+
+%%
+
+int main()
+{
+
+	return yyparse();
+}
+
+void yyerror(const char * message)
+{
+	output::errorSyn(yylineno);
+	exit(0);
+}
+
+void checkValidCast(const string &type, const string &exp_type){
+    if(exp_type != "SET" || type != "INT"){
+        output::errorMismatch(yylineno);
+        exit(0);
+    }
+}
+
+void checkValidByte(int val){
+    if(val > 255){
+        output::errorByteTooLarge(yylineno, to_string(val));
+        exit(0);
+    }
+}
+
+string PlusMinusType(const string &a, const string &b){
+    if(a == "INT" && b == "INT"){
+        return "INT";
+    }
+    if(a == "BYTE" && b == "BYTE"){
+        return "BYTE";
+    }
+   if(a == "INT" && b == "BYTE" || b == "INT" && a == "BYTE"){
+        return "INT";
+   }
+   if(a == "SET"){
+	    if(b == "BYTE" || b == "INT"){
+	        return "SET";
+	    }
+   }
+   else if (b == "SET"){
+       if(a == "BYTE" || a == "INT"){
+       	        return "SET";
+       	    }
+   }
+   output::errorMismatch(yylineno);
+   exit(0);
+}
+
+string MulDivType(const string &a, const string &b){
+    if(a == "INT" && b == "INT"){
+        return "INT";
+    }
+    if(a == "BYTE" && b == "BYTE"){
+        return "BYTE";
+    }
+   if(a == "INT" && b == "BYTE" || b == "INT" && a == "BYTE"){
+        return "INT";
+   }
+   output::errorMismatch(yylineno);
+   exit(0);
+}
+
+void check_valid_bool(const string &exp){
+    if(exp != "BOOL"){
+      output::errorMismatch(yylineno);
+      exit(0);
+   }
+}
+
+void check_valid_in(const string &type1, const string &type2){
+    if((type1 == "INT" || type1 == "BYTE") && type2 == "SET"){
+        return;
+    }
+    output::errorMismatch(yylineno);
+    exit(0);
+}
+
+void check_valid_relop(const string &type1, const string &type2){
+    if((type1 == "INT" || type1 == "BYTE") && (type2 == "INT" || type2 == "BYTE")){
+        return;
+    }
+    output::errorMismatch(yylineno);
+    exit(0);
+}
