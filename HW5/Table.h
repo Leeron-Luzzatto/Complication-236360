@@ -6,6 +6,8 @@
 #define HW3_TABLE_H
 #include "hw3_output.hpp"
 #include "parser.hpp"
+#include "bp.hpp"
+#include "utils.h"
 #include <string>
 #include <vector>
 using namespace std;
@@ -138,18 +140,18 @@ public:
             output::errorMainMissing();
             exit(0);
         }
-        output::endScope();
+        //output::endScope();
         Scope* s = table->back();
 //        for(Entry* e : *(s->entries)){
         for(int i=0; i<s->entries->size(); i++){
             Entry* e = (*(s->entries))[i];
-            output::printID(e->name, e->offset, e->type);
+//            output::printID(e->name, e->offset, e->type);
         }
         max_offset-=s->max_offset;
         table->pop_back();
     }
     void ScopeEnd(){
-        output::endScope();
+//        output::endScope();
         Scope* s = table->back();
         for(int i=0; i<s->entries->size(); i++){
             Entry* e = (*(s->entries))[i];
@@ -195,6 +197,30 @@ public:
             i--;
         }
         table->push_back(new_scope);
+
+        //LLVM part
+        FUNC_NUMBER++;
+        string llvm_ret_type = retType == "VOID" ? "void" : "i32";
+        string args_list = "";
+        string arg;
+        for(int j = 0; j<argTypes.size(); j++){
+            if(j == 0){
+                args_list += "i32 %func" + to_string(FUNC_NUMBER) + + "arg" + std::to_string(j);
+            }
+            else{
+                args_list += ", i32 %func" + to_string(FUNC_NUMBER) + + "arg" + std::to_string(j);
+            }
+        }
+
+        emit("define " + llvm_ret_type + " @" + func_name + "(" + args_list + ") {");
+        string stack = freshFuncPointerReg();
+        emit(stack + " = alloca i32, i32 50");
+        for(int j = 0; j<argTypes.size(); j++){
+            string reg = freshReg();
+            emit(reg + "= getelementptr inbounds i32, i32* "   + stack +", i32 " + to_string(j));
+            emit("store i32 %func" + to_string(FUNC_NUMBER) + "arg" + to_string(j) + ", i32* " + reg);
+        }
+
     }
     void addVar(N* type, N* name){
         Scope* scope = table->back();

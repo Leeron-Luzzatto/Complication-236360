@@ -2,6 +2,8 @@
 	extern int yylex();
     extern int yylineno;
 	void yyerror(const char*);
+	#include "bp.hpp"
+	#include "utils.h"
 	#include "hw3_output.hpp"
 	#include "parser.hpp"
 	#include "Table.h"
@@ -60,14 +62,14 @@
 Program     :   M Funcs x{$$ = $1; table->FinalScopeEnd(); exit(0);}
             ;
 
-M           :   {table = new SymbolTable();}
+M           :   {table = new SymbolTable(); init_llvm();}
             ;
 
 Funcs       :   {$$ = new Funcs();}   |   FuncDecl Funcs{$$ = new Funcs();}
             ;
 
 FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4);}
-                LBRACE Statements RBRACE{table->ScopeEnd();}
+                LBRACE Statements RBRACE{table->ScopeEnd(); utils::func_end(((Type_var*)$1)->type);}
             ;
 
 RetType     :   Type{$$ = $1;}   |   VOID{$$ = new Type_var("VOID");}
@@ -82,7 +84,7 @@ FormalsList :   FormalDecl{$$ = new FormalsList(((Argument*)$1)->type, ((Argumen
                     {$$ = ((FormalsList*)$3); ((FormalsList*)$$)->addType(((Argument*)$1)->type, ((Argument*)$1)->name); delete $1;}
             ;
 
-FormalDecl  :   Type ID{$$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val);}
+FormalDecl  :   Type ID{$$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val); delete $1; delete $2;}
             ;
 
 Statements  :   Statement{$$ = new Statements($1);} |   Statements Statement{$$ = new Statements($2, $1);}
@@ -200,14 +202,16 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
 
 int main()
 {
-
-	return yyparse();
+	 int res = yyparse();
+	 printGlobalBuffer();
+     printCodeBuffer();
+     return res;
 }
 
 void yyerror(const char * message)
 {
 	output::errorSyn(yylineno);
-	exit(0);
+	exit(1);
 }
 
 void checkValidCast(const string &type, const string &exp_type){

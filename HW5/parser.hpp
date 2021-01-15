@@ -131,6 +131,11 @@ struct If_statement : public N{
 
 };
 
+struct BP: public N{
+    string label;
+    BP(const string& label) : label(label) {}
+};
+
 #define YYSTYPE N*
 
 #endif //HW3_PARSER_H
