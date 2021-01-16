@@ -108,6 +108,8 @@ public:
         return "None";
     }
 
+    int getOffset
+
 };
 
 
@@ -222,14 +224,14 @@ public:
         }
 
     }
-    void addVar(N* type, N* name){
+    int addVar(N* type, N* name){
         Scope* scope = table->back();
         if(isVarDeclared(name) || isFuncDeclared(name)){
             output::errorDef(yylineno, ((Node*)name)->val);
             exit(0);
         }
         scope->addVar(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
-        max_offset++;
+        return max_offset++;
 
 //        printf("Global offset increased to %d by %s\n", max_offset, ((Node*)name)->val.c_str());
     }

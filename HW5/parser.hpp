@@ -12,6 +12,9 @@
 using namespace std;
 
 struct N{
+    string regName;
+    string label;
+
 };
 
 struct Node : public N{
