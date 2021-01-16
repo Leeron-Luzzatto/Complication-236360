@@ -6,7 +6,7 @@
 #define HW3_PARSER_H
 
 #include "hw3_output.hpp"
-
+#include "bp.hpp"
 
 #include <string>
 using namespace std;
@@ -14,6 +14,8 @@ using namespace std;
 struct N{
     string regName;
     string label;
+    vector<pair<int,BranchLabelIndex>> truelist;
+    vector<pair<int,BranchLabelIndex>> falselist;
 
 };
 

@@ -168,45 +168,73 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      delete $3;}   |
                 ID                  {string type = table->getVarType($1);
                                      $$ = new Expression(type);
+                                     int offset = table->getVarOffset($1);
+                                     string stackP = freshReg();
+                                     emit(stackP + "= getelementptr inbounds i32, i32* %funcArgs" + to_string(function_counter) + ", i32 " + to_string(offset));
+                                     string reg = freshReg();
+                                     emit(reg + "= load i32, i32* " + stackPointer);
+                                     llvm_bool_handle($$, reg);
                                      delete $1;}   |
                 Call                {$$ = new Expression(((Type_var*)$1)->type);
                                      delete $1;}   |
                 NUM                 {$$ = new Expression("INT");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
+                                     $$->registerName = freshReg();
+                                     emit($$->registerName + " = add i32 0," + ((Expression*)$$)->number);
                                      delete $1;}   |
                 NUM B               {checkValidByte(stoi(((Node*)$1)->val));
                                      $$ = new Expression("BYTE");
-                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);}   |
+                                     ((Expression*)$$)->number = stoi(((Node*)$1)->val);
+                                     $$->registerName = freshReg();
+                                     emit($$->registerName + "= add i32 0," + ((Expression*)$$)->number);}   |
                 STRING              {$$ = new Expression("STRING");
                                      ((Expression*)$$)->str = ((Node*)$1)->val;
+                                     string_handler($$);
                                      delete $1;}   |
                 TRUE                {$$ = new Expression("BOOL");
                                      ((Expression*)$$)->bool_value = true;
+                                     int address = emit("br label @");
+                                     $$->truelist = makelist({address, FIRST});
                                      delete $1;}   |
                 FALSE               {$$ = new Expression("BOOL");
                                      ((Expression*)$$)->bool_value = false;
+                                     int address = emit("br label @");
+                                     $$->falselist = makelist({address, FIRST});
                                      delete $1;}   |
                 NOT Exp             {check_valid_bool(((Expression*)$2)->type);
                                      $$ = new Expression();
-                                     ((Expression*)$$)->type = ((Expression*)$2)->type;}   |
-                Exp AND Exp         {check_valid_bool(((Expression*)$1)->type);
+                                     ((Expression*)$$)->type = ((Expression*)$2)->type;
+                                     $$->truelist = $2->falselist;
+                                     $$->falselist = $2->truelist;
+                                     delete $2;}   |
+                Exp AND M Exp       {check_valid_bool(((Expression*)$1)->type);
                                     check_valid_bool(((Expression*)$3)->type);
                                     $$ = new Expression("BOOL");
+                                    backPatch($1->truelist, $3->val);
+                                    $$->truelist = $4->truelist;
+                                    $$->falselist = merge($1->falselist, $4->falselist);
                                     delete $1;
-                                    delete $3;}   |
-                Exp OR Exp          {check_valid_bool(((Expression*)$1)->type);
+                                    delete $4;}   |
+                Exp OR M Exp        {check_valid_bool(((Expression*)$1)->type);
                                      check_valid_bool(((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
+                                     bpatch($1->falselist, $3->val);
+                                     $$->truelist = merge($1->truelist, $4->truelist);
+                                     $$->falselist = $4->falselist;
                                      delete $1;
-                                     delete $3;}   |
+                                     delete $4;}   |
                 Exp RELOPL Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
+                                     relop_handler($2, $$, $1, $3);
                                      delete $1;
                                      delete $3;}   |
                 Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
+                                     relop_handler($2, $$, $1, $3);
                                      delete $1;
                                      delete $3;}   |
+
+                                     //NEED TO HANDLE THOSE SET CASES
                 Exp RELOP_IN Exp    {check_valid_in(((Expression*)$1)->type,((Expression*)$3)->type);
                                     $$ = new Expression("BOOL");
                                     delete $1;
@@ -214,6 +242,15 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                 LPAREN Type RPAREN Exp  {checkValidCast(((Type_var*)$2)->type, ((Expression*)$4)->type);
                                          $$ = new Expression("INT");
                                          }
+            ;
+
+M:          {
+                   int address = emit("br label @");
+                   string markerLabel = genLabel();
+                   $$ = new Node(markerLabel);
+                   backPatch(makelist({address, FIRST}), markerLabel);
+
+            }
             ;
 
 %%

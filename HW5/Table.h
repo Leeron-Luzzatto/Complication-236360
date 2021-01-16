@@ -301,6 +301,24 @@ public:
             }
         }
     }
+    int getVarOffset(N* n){
+        string name = ((Node*)n)->val;
+        if(!isVarDeclared(n)){
+            output::errorUndef(yylineno, name);
+            exit(0);
+        }
+        //We know variable exits
+        for(int i=table->size() - 1; i>=0; i--){
+            Scope* scope = (*table)[i];
+            for(int j=0; j<scope->entries->size(); j++){
+                Entry* e = (*(scope->entries))[j];
+                if(e->name == name){
+                    //Found it, return type
+                    return e->offset;
+                }
+            }
+        }
+    }
     void checkValidAssign(N* id, N* exp){
         string var_type = getVarType(id);
         // Var exists, check types

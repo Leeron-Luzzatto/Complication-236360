@@ -6,6 +6,7 @@
 #define HW3_UTILS_H
 
 #include "bp.hpp"
+#include "parser.hpp"
 
 #include <string>
 using namespace std;
@@ -30,6 +31,10 @@ string freshReg(){
     return "%r" + std::to_string(REG_COUNTER++);
 }
 
+string freshStr(){
+    return "@.str" + to_string(REG_COUNTER++);
+}
+
 int emit(const string& dataLine){
     return CodeBuffer::instance().emit(dataLine);
 }
@@ -48,6 +53,14 @@ void printCodeBuffer(){
 
 string genLabel(){
     return CodeBuffer::instance().genLabel();
+}
+
+vector<pair<int,BranchLabelIndex>> makeList(pair<int,BranchLabelIndex> item){
+    return CodeBuffer::instance().makelist(item);
+}
+
+void backPatch(const vector<pair<int,BranchLabelIndex>>& address_list, const std::string &label){
+    CodeBuffer::instance().bpatch(address_list, label);
 }
 
 
@@ -71,7 +84,7 @@ void init_llvm(){
 
 }
 
-void func_end(string retType){
+void func_end(const string& retType){
     (retType == "VOID") ? emit("ret void") : emit("ret i32 0");
     CodeBuffer::instance().emit("}");
 }
@@ -119,6 +132,50 @@ void handle_muldiv_exp(const string& resType, const string& binop, const string&
     }
 }
 
+void llvm_bool_handle(N* n, const string& reg){
+    Expression* exp = ((Expression*)exp);
+    if(exp->type=="BOOL") {
+        string brunch = freshReg();
+        emit(brunch + " = icmp eq i32 0, " + reg);
+        int address = emit("br i1 " + brunch + ", label @, label @");
+        exp->falselist = makeList({address,SECOND});
+        exp->truelist = makeList({address,FIRST});
+    }
+    else{
+        exp->regName=reg;
+    }
+}
 
+void string_handler(N* n){
+    Expression* exp = ((Expression*)exp);
+    string strReg1 = freshStr();
+    string numB = to_string(exp->str.length()+1);
+    emitGlobal(strReg1 + " = constant [" + numB + " x i8] c\"" + exp->str + "\\00\"");
+    string strReg2 = freshReg();
+    emit(strReg2 + " = getelementptr [" + numB + " x i8] , ["+ numB + " x i8]* " + strReg1 + ", i32 0, i32 0");
+    exp->regName = strReg2;
+}
+
+void relop_handler(N* n, N* res, N* exp1, N* exp2){
+    string operand = ((Node*)n)->val;
+    string llvm_op;
+    if (operand == "==")
+        llvm_op = "eq";
+    else if (operand == "<")
+        llvm_op = "slt";
+    else if (operand == ">")
+        llvm_op = "sgt";
+    else if (operand == "<=")
+        llvm_op = "sle";
+    else if (operand == ">=")
+        llvm_op = "sge";
+    else if (operand == "!+")
+        llvm_op = "ne";
+    string condReg = freshReg();
+    emit(condReg + " = icmp " + llvm_op + " i32 " + exp1->regName + ", " + exp2->regName);
+    int address = emit("br i1 " + condReg + ", label @, label @");
+    res->truelist = makeList({address, FIRST});
+    res->falselist = makeList({address, SECOND});
+}
 
 #endif //HW3_UTILS_H
