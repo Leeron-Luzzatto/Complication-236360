@@ -207,10 +207,10 @@ public:
         string arg;
         for(int j = 0; j<argTypes.size(); j++){
             if(j == 0){
-                args_list += "i32 %func" + to_string(FUNC_NUMBER) + + "arg" + std::to_string(j);
+                args_list += "i32 %func" + to_string(FUNC_NUMBER) + + "arg" + to_string(j);
             }
             else{
-                args_list += ", i32 %func" + to_string(FUNC_NUMBER) + + "arg" + std::to_string(j);
+                args_list += ", i32 %func" + to_string(FUNC_NUMBER) + + "arg" + to_string(j);
             }
         }
 

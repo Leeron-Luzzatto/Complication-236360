@@ -178,4 +178,36 @@ void relop_handler(N* n, N* res, N* exp1, N* exp2){
     res->falselist = makeList({address, SECOND});
 }
 
+void bool_statement(N* n, int offset){
+    offset = offset < 0 ? -1 * offset -1 : offset;
+    Expression* exp = ((Expression*)exp);
+    string stackP = freshReg();
+    if(exp->type != "BOOL"){
+        emit(stackP + "= getelementptr inbounds i32, i32* %funcArgs" + to_string(FUNC_COUNTER) + ", i32 " + to_string(offset));
+        emit("store i32 " + exp->regName + ", i32* " + stackP);
+    }
+    else{
+        string phiResult = freshReg();
+        string regResult = freshReg();
+        string fLabel = genLabel();;
+        int falseAddress = emit("br label @");
+        string tLabel = genLabel();
+        int trueAddress = emit("br label @");
+        backPatch(exp->truelist, tLabel);
+        backPatch(exp->falselist, fLabel);
+        string phiLabel = genLabel();
+        backPatch(makeList({trueAddress,FIRST}), phiLabel);
+        backPatch(makeList({falseAddress,FIRST}), phiLabel);
+
+        string toLoad = freshReg();
+        emit(phiResult + " = phi i1 [0, %"+fLabel+"], [1, %"+tLabel+"]");
+        emit(toLoad + "= zext i1 "+ phiResult+" to i32");
+        if(!exp->label.empty()){
+            emit("br label %" + exp->label);
+        }
+        emit(stackP + "= getelementptr inbounds i32, i32* %funcArgs" + to_string(FUNC_COUNTER) + ", i32 " + to_string(offset));
+        emit("store i32 " + toLoad + ", i32* " + stackP);
+    }
+}
+
 #endif //HW3_UTILS_H
