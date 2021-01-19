@@ -16,7 +16,7 @@ struct N{
     string label;
     vector<pair<int,BranchLabelIndex>> truelist;
     vector<pair<int,BranchLabelIndex>> falselist;
-
+    vector<pair<int,BranchLabelIndex>> nextlist;
 };
 
 struct Node : public N{

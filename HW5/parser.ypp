@@ -59,7 +59,8 @@
 
 %%
 
-Program     :   M Funcs x{$$ = $1; table->FinalScopeEnd(); exit(0);}
+Program     :   M Funcs x{$$ = $1; table->FinalScopeEnd(); printGlobalBuffer();
+                                                           printCodeBuffer(); exit(0);}
             ;
 
 M           :   {table = new SymbolTable(); init_llvm();}
@@ -69,7 +70,7 @@ Funcs       :   {$$ = new Funcs();}   |   FuncDecl Funcs{$$ = new Funcs();}
             ;
 
 FuncDecl    :   RetType ID LPAREN Formals RPAREN {table->addFunction($1, $2, $4);}
-                LBRACE Statements RBRACE{table->ScopeEnd(); func_end(((Type_var*)$1)->type}
+                LBRACE Statements RBRACE{table->ScopeEnd(); func_end(((Type_var*)$1)->type);}
             ;
 
 RetType     :   Type{$$ = $1;}   |   VOID{$$ = new Type_var("VOID");}
@@ -84,36 +85,83 @@ FormalsList :   FormalDecl{$$ = new FormalsList(((Argument*)$1)->type, ((Argumen
                     {$$ = ((FormalsList*)$3); ((FormalsList*)$$)->addType(((Argument*)$1)->type, ((Argument*)$1)->name); delete $1;}
             ;
 
-FormalDecl  :   Type ID{$$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val); delete $1; delete $2;}
+FormalDecl  :   Type ID{if(table->isVarDeclared($2) || table->isFuncDeclared($2)){
+                        									output::errorDef(yylineno, ((Node*)$2)->val);
+                        									exit(1);
+                        }
+                        $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val);
+                        delete $1;
+                        delete $2;}
             ;
 
-Statements  :   Statement{$$ = new Statements($1);} |   Statements Statement{$$ = new Statements($2, $1);}
+Statements  :   Statement{$$ = new Statements($1); $$->nextlist = $1->nextlist;} |
+
+                Statements M Statement{$$ = new Statements($2, $1);
+                                       backPatch($1->nextlist, ((Node*)($2))->val);
+                                       $$->nextlist = $3->nextlist;
+                                       }
             ;
 
 Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd(); $$ = $2; delete $2;}
                                             |
-                Type ID SC                 {int offset = table->addVar($1, $2);
+                Type ID SC                 {table->addVar($1, $2);
                                             $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val);
+                                            int offset = table->getVarOffset($2);
                                             string stackP = freshReg();
                                             //Handle SET init to empty group
-                                            emit(stackP + "= getelementptr inbounds i32, i32* %funcArgs" + to_string(FUNC_COUNTER) + ", i32 " + to_string(offset));
-                                            emit("store i32 0, i32* " + stackP);}
+                                            emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+                                            emit("store i32 0, i32* " + stackP);
+                                            delete $2;
+                                            }
                                             |
-                Type ID ASSIGN Exp SC      {int offset = table->addVar($1, $2);
+                Type ID ASSIGN Exp SC      {table->addVar($1, $2);
                                             table->checkValidAssign($2, $4);
                                             $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val, $4);
-                                            bool_statement($4, offset);
-
-                                            }  |
-                ID ASSIGN Exp SC           {table->checkValidAssign($1, $3);}  |
+                                            int offset = table->getVarOffset($2);
+                                            exp_handler($4, offset);
+                                            delete $1;
+                                            delete $2;
+                                            delete $3;
+                                            delete $4;
+                                            delete $5;}  |
+                ID ASSIGN Exp SC           {if(!table->isVarDeclared($2)){
+                                                output::errorUndef(yylineno, ((Node*)$1)->val);
+                                                exit(1);
+                                           }
+                                           table->checkValidAssign($1, $3);
+                                           int offset = table->getVarOffset($1);
+                                           exp_handler($3, offset);
+                                           delete $3;
+                                           }  |
                 Call SC                    {$$ = $1;}  |
                 RETURN SC                  {table->checkCurrFuncVoid(); }  |
                 RETURN Exp SC              {table->checkRetType($2); }  |
-                IF LPAREN Exp RPAREN EnterScope Statement
-                        {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6);table->ScopeEnd();}  |
-                IF LPAREN Exp RPAREN EnterScope Statement ELSE {table->ScopeEnd();table->newScope();} Statement
-                         {check_valid_bool(((Expression*)$3)->type); $$ = new If_statement($3, $6, $9);table->ScopeEnd();}  |
-                WHILE LPAREN Exp RPAREN EnterWhile Statement {check_valid_bool(((Expression*)$3)->type); table->ScopeEnd();}  |
+                IF LPAREN Exp RPAREN EnterScope M Statement
+                        {check_valid_bool(((Expression*)$3)->type);
+                        $$ = new If_statement($3, $7);
+                        table->ScopeEnd();
+                        backPatch($3->truelist, $6->val);
+                        $$->nextlist = merge($3->falselist, $7->nextlist);
+                        }  |
+                IF LPAREN Exp RPAREN EnterScope M Statement ELSE {table->ScopeEnd();
+                                                                  table->newScope();
+                                                                  backPatch($3->truelist, $6->val);
+                                                                  int address = emit("br label @");
+                                                                  $7->nextlist = merge($7->nextlist, makelist({address, FIRST}));}
+                                                M Statement
+                                                                 {check_valid_bool(((Expression*)$3)->type);
+                                                                  $$ = new If_statement($3, $6, $9);
+                                                                  table->ScopeEnd();
+                                                                  backPatch($3->falselist, $9->val);
+                                                                  $$->nextlist = merge($7->nextlist, $10->nextlist);
+                                                                  string label = genLabel();
+                                                                  backPatch($$->nextlist, label);}  |
+                WHILE M LPAREN Exp RPAREN EnterWhile M Statement {check_valid_bool(((Expression*)$3)->type);
+                                                                  table->ScopeEnd();
+                                                                  bpatch($8->nextlist, $2->val);
+                                                                  bpatch($4->truelist, $7->val);
+                                                                  $$->nextlist = $4->nextlist;
+                                                                  }  |
                 BREAK SC                   {table->checkInWhile(true);}  |
                 CONTINUE SC                {table->checkInWhile();}
             ;
@@ -123,15 +171,15 @@ EnterScope  :   {table->newScope();}
 EnterWhile  :   {table->newScope(true);}
 
 Call        :   ID LPAREN ExpList RPAREN{
-                    if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
-                                                 delete $1;
-                                                 delete $3;
-                                                 exit(0);}
-                    table->checkValidArgs($1, ((Exp_list*)$3)->types);
-                    $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
-                    delete $1;
-                    delete $3;
-                }  |
+                                            if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
+                                                                         delete $1;
+                                                                         delete $3;
+                                                                         exit(0);}
+                                            table->checkValidArgs($1, ((Exp_list*)$3)->types);
+                                            $$ = new Type_var(table->getFuncRetType((((Node*)$1)->val)));
+                                            delete $1;
+                                            delete $3;
+                                        }  |
                 ID LPAREN RPAREN        {
                 if(!table->isFuncDeclared($1)){output::errorUndefFunc(yylineno, ((Node*)$1)->val);
                                                                  delete $1;
@@ -158,36 +206,36 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      $$ = new Expression();
                                      ((Expression*)$$)->type = type;
                                      $$->regName = freshReg();
-                                     handle_muldiv_exp(type, ((Node*)$1)->val, $$->regName, $1->regName, $3->regName);
+                                     operand_handler(type, ((Node*)$1)->val, $$->regName, $1->regName, $3->regName);
                                      delete $1;
                                      delete $3;
                                      }   |
-                Exp PLUSMINUS Exp   {//NEED TO HANDE SET CASE
+                Exp PLUSMINUS Exp   {
                                      string type = PlusMinusType(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression(type);
+                                     $$->regName = freshReg();
+                                     //$$$$$$$$$$$$$$$$$$$$$$$NEED TO HANDE SET CASE
+                                     operand_handler(type, ((Node*)$1)->val, $$->regName, $1->regName, $3->regName);
                                      delete $1;
                                      delete $3;}   |
                 ID                  {string type = table->getVarType($1);
                                      $$ = new Expression(type);
                                      int offset = table->getVarOffset($1);
-                                     string stackP = freshReg();
-                                     emit(stackP + "= getelementptr inbounds i32, i32* %funcArgs" + to_string(function_counter) + ", i32 " + to_string(offset));
-                                     string reg = freshReg();
-                                     emit(reg + "= load i32, i32* " + stackPointer);
-                                     llvm_bool_handle($$, reg);
+                                     id_handler($1, offset);
                                      delete $1;}   |
                 Call                {$$ = new Expression(((Type_var*)$1)->type);
                                      delete $1;}   |
                 NUM                 {$$ = new Expression("INT");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      $$->registerName = freshReg();
-                                     emit($$->registerName + " = add i32 0," + ((Expression*)$$)->number);
+                                     emit($$->regName + " = add i32 " +((Expression*)$$)->number + ", 0");
                                      delete $1;}   |
                 NUM B               {checkValidByte(stoi(((Node*)$1)->val));
                                      $$ = new Expression("BYTE");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
                                      $$->registerName = freshReg();
-                                     emit($$->registerName + "= add i32 0," + ((Expression*)$$)->number);}   |
+                                     emit($$->registerName + " = add i32 " + ((Expression*)$$)->number + ", 0");
+                                     delete $1;}   |
                 STRING              {$$ = new Expression("STRING");
                                      ((Expression*)$$)->str = ((Node*)$1)->val;
                                      string_handler($$);
@@ -209,33 +257,39 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      $$->falselist = $2->truelist;
                                      delete $2;}   |
                 Exp AND M Exp       {check_valid_bool(((Expression*)$1)->type);
-                                    check_valid_bool(((Expression*)$3)->type);
-                                    $$ = new Expression("BOOL");
-                                    backPatch($1->truelist, $3->val);
-                                    $$->truelist = $4->truelist;
-                                    $$->falselist = merge($1->falselist, $4->falselist);
-                                    delete $1;
-                                    delete $4;}   |
+                                     check_valid_bool(((Expression*)$3)->type);
+                                     $$ = new Expression("BOOL");
+                                     backPatch($1->truelist, $3->val);
+                                     $$->truelist = $4->truelist;
+                                     $$->falselist = merge($1->falselist, $4->falselist);
+                                     delete $1;
+                                     delete $2;
+                                     delete $3;
+                                     delete $4;}   |
                 Exp OR M Exp        {check_valid_bool(((Expression*)$1)->type);
                                      check_valid_bool(((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
-                                     bpatch($1->falselist, $3->val);
+                                     backPatch($1->falselist, $3->val);
                                      $$->truelist = merge($1->truelist, $4->truelist);
                                      $$->falselist = $4->falselist;
                                      delete $1;
+                                     delete $2;
+                                     delete $3;
                                      delete $4;}   |
                 Exp RELOPL Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
                                      relop_handler($2, $$, $1, $3);
                                      delete $1;
+                                     delete $2;
                                      delete $3;}   |
                 Exp RELOPN Exp      {check_valid_relop(((Expression*)$1)->type, ((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
                                      relop_handler($2, $$, $1, $3);
                                      delete $1;
+                                     delete $2;
                                      delete $3;}   |
 
-                                     //NEED TO HANDLE THOSE SET CASES
+                                     //$$$$$$$$$NEED TO HANDLE THOSE SET CASES
                 Exp RELOP_IN Exp    {check_valid_in(((Expression*)$1)->type,((Expression*)$3)->type);
                                     $$ = new Expression("BOOL");
                                     delete $1;
@@ -258,10 +312,8 @@ M:          {
 
 int main()
 {
-	 int res = yyparse();
-	 printGlobalBuffer();
-     printCodeBuffer();
-     return res;
+	 return yyparse();
+
 }
 
 void yyerror(const char * message)

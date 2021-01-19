@@ -107,9 +107,6 @@ public:
         }
         return "None";
     }
-
-    int getOffset
-
 };
 
 
@@ -201,26 +198,24 @@ public:
         table->push_back(new_scope);
 
         //LLVM part
-        FUNC_NUMBER++;
         string llvm_ret_type = retType == "VOID" ? "void" : "i32";
         string args_list = "";
-        string arg;
         for(int j = 0; j<argTypes.size(); j++){
             if(j == 0){
-                args_list += "i32 %func" + to_string(FUNC_NUMBER) + + "arg" + to_string(j);
+                args_list += "i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j+1);
             }
             else{
-                args_list += ", i32 %func" + to_string(FUNC_NUMBER) + + "arg" + to_string(j);
+                args_list += ", i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j+1);
             }
         }
 
         emit("define " + llvm_ret_type + " @" + func_name + "(" + args_list + ") {");
-        string stack = freshFuncPointerReg();
+        string stack = "%func" + to_string(FUNC_COUNTER) + "args";
         emit(stack + " = alloca i32, i32 50");
         for(int j = 0; j<argTypes.size(); j++){
             string reg = freshReg();
-            emit(reg + "= getelementptr inbounds i32, i32* "   + stack +", i32 " + to_string(j));
-            emit("store i32 %func" + to_string(FUNC_NUMBER) + "arg" + to_string(j) + ", i32* " + reg);
+            emit(reg + "= getelementptr inbounds i32, i32* "   + stack + ", i32 " + to_string(j));
+            emit("store i32 %func" + to_string(FUNC_COUNTER) + "args" + to_string(j+1) + ", i32* " + reg);
         }
 
     }
@@ -302,6 +297,7 @@ public:
         }
     }
     int getVarOffset(N* n){
+        int offset = 0;
         string name = ((Node*)n)->val;
         if(!isVarDeclared(n)){
             output::errorUndef(yylineno, name);
@@ -313,11 +309,13 @@ public:
             for(int j=0; j<scope->entries->size(); j++){
                 Entry* e = (*(scope->entries))[j];
                 if(e->name == name){
-                    //Found it, return type
-                    return e->offset;
+                    //Found it, return offset
+                    return offset;
                 }
+                offset++;
             }
         }
+        return -10;
     }
     void checkValidAssign(N* id, N* exp){
         string var_type = getVarType(id);
