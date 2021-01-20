@@ -154,7 +154,7 @@ public:
         Scope* s = table->back();
         for(int i=0; i<s->entries->size(); i++){
             Entry* e = (*(s->entries))[i];
-            output::printID(e->name, e->offset, e->type);
+            //output::printID(e->name, e->offset, e->type);
             if(e->offset >= 0){
                 max_offset--;
             }
@@ -198,6 +198,7 @@ public:
         table->push_back(new_scope);
 
         //LLVM part
+        FUNC_COUNTER++;
         string llvm_ret_type = retType == "VOID" ? "void" : "i32";
         string args_list = "";
         for(int j = 0; j<argTypes.size(); j++){
@@ -215,7 +216,7 @@ public:
         for(int j = 0; j<argTypes.size(); j++){
             string reg = freshReg();
             emit(reg + "= getelementptr inbounds i32, i32* "   + stack + ", i32 " + to_string(j));
-            emit("store i32 %func" + to_string(FUNC_COUNTER) + "args" + to_string(j+1) + ", i32* " + reg);
+            emit("store i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j+1) + ", i32* " + reg);
         }
 
     }
@@ -311,6 +312,9 @@ public:
                 if(e->name == name){
                     //Found it, return offset
                     return offset;
+                }
+                if(e->is_function){
+                    continue;
                 }
                 offset++;
             }

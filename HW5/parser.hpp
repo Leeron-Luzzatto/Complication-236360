@@ -17,6 +17,12 @@ struct N{
     vector<pair<int,BranchLabelIndex>> truelist;
     vector<pair<int,BranchLabelIndex>> falselist;
     vector<pair<int,BranchLabelIndex>> nextlist;
+
+    N(){
+        truelist = vector<pair<int,BranchLabelIndex>>();
+        falselist = vector<pair<int,BranchLabelIndex>>();
+        nextlist = vector<pair<int,BranchLabelIndex>>();
+    }
 };
 
 struct Node : public N{
@@ -117,12 +123,15 @@ struct Expression : public N{
 
 struct Exp_list : public N{
     vector<string> types;
+    vector<string> args;
 
-    Exp_list(const string& type){
+    Exp_list(const string& type, const string& name = ""){
         this->types.push_back(type);
+        this->args.push_back(name);
     }
-    void addType(const string& type){
+    void addType(const string& type, const string& name = ""){
         this->types.push_back(type);
+        this->args.push_back(name);
     }
 
 };

@@ -89,11 +89,11 @@ void func_end(const string& retType){
 }
 
 void check_zero_div(const string& reg){
-    string brunchReg = freshReg();
-    emit(brunchReg + "= icmp eq i32 " + reg + ", 0");
+    string branchReg = freshReg();
+    emit(branchReg + "= icmp eq i32 " + reg + ", 0");
     string trueLabel = freshDivLabel();
     string falseLabel = freshDivLabel();
-    emit("br i1 " + brunchReg + ", label %" + trueLabel + ", label %" + falseLabel);
+    emit("br i1 " + branchReg + ", label %" + trueLabel + ", label %" + falseLabel);
     emit(trueLabel + ":");
     string zeroDivReg = freshReg();
     emit(zeroDivReg + " = getelementptr [23 x i8], [23 x i8]* @.div_by_zero, i32 0, i32 0");
@@ -103,7 +103,7 @@ void check_zero_div(const string& reg){
     emit(falseLabel + ":");
 }
 
-void operand_handler(const string& resType, const string& binop, const string& resReg, const string& reg1, const string& reg2){
+void operand_handler_no_set(const string& resType, const string& binop, const string& resReg, const string& reg1, const string& reg2){
     if(resType == "INT"){
         if(binop == "*"){
             emit(resReg + " = mul i32 " + reg1 + "," + reg2);
@@ -112,12 +112,6 @@ void operand_handler(const string& resType, const string& binop, const string& r
             //DIV
             check_zero_div(reg2);
             emit(resReg + " = sdiv i32 " + reg1 + "," + reg2);
-        }
-        else if(binop == "-"){
-            emit(resReg + " = sub i32 " + reg1 + "," + reg2);
-        }
-        else if(binop == "+"){
-            emit(resReg + " = add i32 " + reg1 + "," + reg2);
         }
     }
     else{
@@ -132,7 +126,25 @@ void operand_handler(const string& resType, const string& binop, const string& r
             check_zero_div(reg2);
             emit(tmp1 + " = sdiv i32 " + reg1 + "," + reg2);
         }
-        else if(binop == "-"){
+        emit(tmp2 + " = trunc i32 " + tmp1 + " to i8");
+        emit(resReg + "= zext i8 " + tmp2 + " to i32");
+    }
+}
+
+void operand_handler_with_set(const string& resType, const string& binop, const string& resReg, const string& reg1, const string& reg2){
+    if(resType == "INT"){
+        if(binop == "-"){
+            emit(resReg + " = sub i32 " + reg1 + "," + reg2);
+        }
+        else if(binop == "+"){
+            emit(resReg + " = add i32 " + reg1 + "," + reg2);
+        }
+    }
+    else if(resType == "BYTE"){
+        //BYTE type
+        string tmp1 = freshReg();
+        string tmp2 = freshReg();
+        if(binop == "-"){
             emit(tmp1 + " = sub i32 " + reg1 + "," + reg2);
         }
         else if(binop == "+"){
@@ -141,14 +153,18 @@ void operand_handler(const string& resType, const string& binop, const string& r
         emit(tmp2 + " = trunc i32 " + tmp1 + " to i8");
         emit(resReg + "= zext i8 " + tmp2 + " to i32");
     }
+    else if(resType == "SET"){
+        //TO DO: COMPLETE
+    }
+
 }
 
 void llvm_bool_handle(N* n, const string& reg){
     Expression* exp = ((Expression*)exp);
     if(exp->type=="BOOL") {
-        string brunch = freshReg();
-        emit(brunch + " = icmp eq i32 0, " + reg);
-        int address = emit("br i1 " + brunch + ", label @, label @");
+        string branch = freshReg();
+        emit(branch + " = icmp eq i32 0, " + reg);
+        int address = emit("br i1 " + branch + ", label @, label @");
         exp->falselist = makeList({address,SECOND});
         exp->truelist = makeList({address,FIRST});
     }
@@ -180,7 +196,7 @@ void relop_handler(N* n, N* res, N* exp1, N* exp2){
         llvm_op = "sle";
     else if (operand == ">=")
         llvm_op = "sge";
-    else if (operand == "!+")
+    else if (operand == "!=")
         llvm_op = "ne";
     string condReg = freshReg();
     emit(condReg + " = icmp " + llvm_op + " i32 " + exp1->regName + ", " + exp2->regName);
@@ -226,16 +242,27 @@ void id_handler(N* n, int offset){
     emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
     string tmp = freshReg();
     emit(tmp + "= load i32, i32* " + stackP);
-    if(exp->type != "BOOL"){
-        exp->regName = tmp;
-    }
-    else{
+    if(exp->type == "BOOL"){
         string cond = freshReg();
         emit(cond + " = icmp eq i32 0, " + tmp);
         int address = emit("br i1 " + cond + ", label @, label @");
         exp->falselist = makeList({address, FIRST});
         exp->truelist = makeList({address, SECOND});
     }
+    else if(exp->type != "BOOL"){
+        exp->regName = tmp;
+    }
+    else if(exp->type == "SET"){
+
+    }
+
+}
+
+void func_call(N* got_id, N* got_expList){
+    Expression* ID = ((Expression*)got_id);
+    Exp_list* expList = ((Exp_list*)got_expList);
+
+
 }
 
 #endif //HW3_UTILS_H
