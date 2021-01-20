@@ -140,26 +140,26 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                         {check_valid_bool(((Expression*)$3)->type);
                         $$ = new If_statement($3, $7);
                         table->ScopeEnd();
-                        backPatch($3->truelist, $6->val);
+                        backPatch($3->truelist, ((Node*)$6)->val);
                         $$->nextlist = merge($3->falselist, $7->nextlist);
                         }  |
                 IF LPAREN Exp RPAREN EnterScope M Statement ELSE {table->ScopeEnd();
                                                                   table->newScope();
-                                                                  backPatch($3->truelist, $6->val);
+                                                                  backPatch($3->truelist, ((Node*)$6)->val);
                                                                   int address = emit("br label @");
-                                                                  $7->nextlist = merge($7->nextlist, makelist({address, FIRST}));}
+                                                                  $7->nextlist = merge($7->nextlist, makeList({address, FIRST}));}
                                                 M Statement
                                                                  {check_valid_bool(((Expression*)$3)->type);
                                                                   $$ = new If_statement($3, $6, $9);
                                                                   table->ScopeEnd();
-                                                                  backPatch($3->falselist, $9->val);
+                                                                  backPatch($3->falselist, ((Node*)$9)->val);
                                                                   $$->nextlist = merge($7->nextlist, $10->nextlist);
                                                                   string label = genLabel();
                                                                   backPatch($$->nextlist, label);}  |
                 WHILE M LPAREN Exp RPAREN EnterWhile M Statement {check_valid_bool(((Expression*)$3)->type);
                                                                   table->ScopeEnd();
-                                                                  bpatch($8->nextlist, $2->val);
-                                                                  bpatch($4->truelist, $7->val);
+                                                                  backPatch($8->nextlist, ((Node*)$2)->val);
+                                                                  backPatch($4->truelist, ((Node*)$7)->val);
                                                                   $$->nextlist = $4->nextlist;
                                                                   }  |
                 BREAK SC                   {table->checkInWhile(true);}  |
@@ -227,14 +227,14 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      delete $1;}   |
                 NUM                 {$$ = new Expression("INT");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
-                                     $$->registerName = freshReg();
-                                     emit($$->regName + " = add i32 " +((Expression*)$$)->number + ", 0");
+                                     $$->regName = freshReg();
+                                     emit($$->regName + " = add i32 " + to_string(((Expression*)$$)->number) + ", 0");
                                      delete $1;}   |
                 NUM B               {checkValidByte(stoi(((Node*)$1)->val));
                                      $$ = new Expression("BYTE");
                                      ((Expression*)$$)->number = stoi(((Node*)$1)->val);
-                                     $$->registerName = freshReg();
-                                     emit($$->registerName + " = add i32 " + ((Expression*)$$)->number + ", 0");
+                                     $$->regName = freshReg();
+                                     emit($$->regName + " = add i32 " + to_string(((Expression*)$$)->number) + ", 0");
                                      delete $1;}   |
                 STRING              {$$ = new Expression("STRING");
                                      ((Expression*)$$)->str = ((Node*)$1)->val;
@@ -243,12 +243,12 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                 TRUE                {$$ = new Expression("BOOL");
                                      ((Expression*)$$)->bool_value = true;
                                      int address = emit("br label @");
-                                     $$->truelist = makelist({address, FIRST});
+                                     $$->truelist = makeList({address, FIRST});
                                      delete $1;}   |
                 FALSE               {$$ = new Expression("BOOL");
                                      ((Expression*)$$)->bool_value = false;
                                      int address = emit("br label @");
-                                     $$->falselist = makelist({address, FIRST});
+                                     $$->falselist = makeList({address, FIRST});
                                      delete $1;}   |
                 NOT Exp             {check_valid_bool(((Expression*)$2)->type);
                                      $$ = new Expression();
@@ -259,7 +259,7 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                 Exp AND M Exp       {check_valid_bool(((Expression*)$1)->type);
                                      check_valid_bool(((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
-                                     backPatch($1->truelist, $3->val);
+                                     backPatch($1->truelist, ((Node*)$3)->val);
                                      $$->truelist = $4->truelist;
                                      $$->falselist = merge($1->falselist, $4->falselist);
                                      delete $1;
@@ -269,7 +269,7 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                 Exp OR M Exp        {check_valid_bool(((Expression*)$1)->type);
                                      check_valid_bool(((Expression*)$3)->type);
                                      $$ = new Expression("BOOL");
-                                     backPatch($1->falselist, $3->val);
+                                     backPatch($1->falselist, ((Node*)$3)->val);
                                      $$->truelist = merge($1->truelist, $4->truelist);
                                      $$->falselist = $4->falselist;
                                      delete $1;
@@ -303,7 +303,7 @@ M:          {
                    int address = emit("br label @");
                    string markerLabel = genLabel();
                    $$ = new Node(markerLabel);
-                   backPatch(makelist({address, FIRST}), markerLabel);
+                   backPatch(makeList({address, FIRST}), markerLabel);
 
             }
             ;
