@@ -114,8 +114,7 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                             int offset = table->getVarOffset($2);
                                             string stackP = freshReg();
                                             //Handle SET_ init to empty group
-                                            emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
-                                            emit("store i32 0, i32* " + stackP);
+                                            new_var_handler($1, $2, offset);
                                             delete $2;
                                             }
                                             |

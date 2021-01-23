@@ -62,12 +62,16 @@ vector<pair<int,BranchLabelIndex>> merge(const vector<pair<int,BranchLabelIndex>
 
 void init_llvm(){
     emitGlobal("@.div_by_zero = constant [23 x i8] c\"Error division by zero\\00\"");
+    emitGlobal("@.set_range_plus = constant [30 x i8] c\"Error out of set range. Op: +\\00\"");
+    emitGlobal("@.set_range_minus = constant [30 x i8] c\"Error out of set range. Op: -\\00\"");
+    emitGlobal("@.set_range_in = constant [31 x i8] c\"Error out of set range. Op: in\\00\"");
     emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
     emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\\0A\\00\"");
 
     emit("declare i32 @printf(i8*, ...)");
     emit("declare void @exit(i32)");
     emit("declare i8* @malloc(i32)");
+    emit("declare i8* @memcpy(i8*, i8*, i32)");
 
     emit("define void @printi(i32) {");
     emit("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
@@ -78,8 +82,6 @@ void init_llvm(){
     emit("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
     emit("ret void");
     emit("}");
-
-
 }
 
 void func_end(const string& retType){
@@ -151,7 +153,13 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
         emit(resReg + "= zext i8 " + tmp2 + " to i32");
     }
     else if(resType == "SET"){
-        //TO DO: COMPLETE
+        if(binop == "-"){
+
+            emit(resReg + " = sub i32 " + reg1 + "," + reg2);
+        }
+        else if(binop == "+"){
+            emit(resReg + " = add i32 " + reg1 + "," + reg2 + " ; + operand");
+        }
     }
 
 }
@@ -218,8 +226,22 @@ void exp_handler(N* n, int offset){
         emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
         emit("store i32 " + toLoad + ", i32* " + stackP);
     }
-    else if(exp->type == "SET_"){
+    else if(exp->type == "SET"){
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+        string toPointer = freshReg();
+        emit(toPointer + " = inttoptr i32 " + stackP + " to i8*");
 
+        string mallocP = freshReg();
+        string sizeToAlloc = to_string(4 * 258); //Size of int(4B) *(MAX SET SIZE + 2 for range)
+        emit( mallocP + " = call i8* @malloc(i32 " + sizeToAlloc + ")");
+
+        emit("call i8* memcpy(" + mallocP +", " + toPointer + ", " + sizeToAlloc + ")");
+
+        emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+             to_string(offset));
+        string toSave = freshReg();
+        emit(toSave + " = ptrtoint  i8* " + mallocP + " to i32");
+        emit("store i32 " + mallocP + ", i32* " + stackP);
     }
     else{
         emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
@@ -243,13 +265,14 @@ void id_handler(N* n, int offset){
     else if(exp->type != "BOOL"){
         exp->regName = tmp;
     }
-    else if(exp->type == "SET_"){
-
+    else if(exp->type == "SET"){ //SET_
+        string toPointer = freshReg();
+        emit(toPointer + " = inttoptr i32 " + stackP + " to i32*");
+        exp->regName = toPointer;
     }
 
 }
 
-string set_type = ""; //TO DO: change this
 
 string func_call(N* got_id, N* got_expList, const string& retType, N* call){
     Node* ID = ((Node*)got_id);
@@ -261,8 +284,8 @@ string func_call(N* got_id, N* got_expList, const string& retType, N* call){
         retReg = "";
         callRes = "";
     }
-    else if(retType == "SET_"){
-        llvmRetType = set_type;
+    else if(retType == "SET"){ //SET_
+        llvmRetType = "i32*";
         retReg = freshReg();
         callRes = retReg + " = ";
     }
@@ -287,15 +310,15 @@ string func_call(N* got_id, N* got_expList, const string& retType, N* call){
                 currentType = "i32";
 
             }
-            else if(expList->types[expList->types.size() -i -1] == "SET_"){
-                currentType = set_type;
+            else if(expList->types[expList->types.size() -i -1] == "SET"){  //SET_
+                currentType = "i32*";
             }
             else{
                 currentType = "i32";
                 currentReg = expList->regNames[expList->types.size() -i -1];
             }
         }
-        if(i>0){
+        if(i<expList->types.size() - 1){
             param_list += ", ";
         }
         param_list += currentType + " " + currentReg;
@@ -322,8 +345,8 @@ string func_call_noParam(N* got_id, const string& retType, N* call){
         retReg = "";
         callRes = "";
     }
-    else if(retType == "SET_"){
-        llvmRetType = set_type;
+    else if(retType == "SET"){ //SET_
+        llvmRetType = i32*;
         retReg = freshReg();
         callRes = retReg + " = ";
     }
@@ -347,23 +370,33 @@ string func_call_noParam(N* got_id, const string& retType, N* call){
 void new_var_handler(N* t, N* id, int offset){
     Type_var* type = ((Type_var*)t);
     string stackP = freshReg();
-    //Handle SET init to empty group
-    if(type->type != "SET_") {
+    //Handle SET_ init to empty group
+    if(type->type != "SET") {
         emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
              to_string(offset));
         emit("store i32 0, i32* " + stackP);
     }
     else{
-//        string mallocP = freshReg();
-//        string sizeToAlloc = to_string(4 * 258); //Size of int(4B) *(MAX SET SIZE + 2 for range)
-//        emit( mallocP + " = call i8* @malloc(i32 " + sizeToAlloc + ") zeroinitializer");
-//        string mallocPointerCast = freshReg();
-//        emit(mallocPointerCast + " = bitcast i8* " + mallocP + " to i32*");
-//        emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
-//             to_string(offset));
-//        emit("store i32 0, i32* " + stackP);
-//        emit("store i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j+1) + ", i32* " + reg);
+        string mallocP = freshReg();
+        string sizeToAlloc = to_string(4 * 258); //Size of int(4B) *(MAX SET SIZE + 2 for range)
+        emit( mallocP + " = call i8* @malloc(i32 " + sizeToAlloc + ")");
+        emit("store i8 zeroinitializer, i8* " + mallocP);
+        string mallocPointerCast = freshReg();
+        emit(mallocPointerCast + " = bitcast i8* " + mallocP + " to i32*");
+        string start = freshReg();
+        string end = freshReg();
+        emit(start + " = getelementptr inbounds i32, i32* " + mallocPointerCast + ", i32 0");
+        emit(end + " = getelementptr inbounds i32, i32* " + mallocPointerCast + ", i32 1");
+        emit("store i32 " + to_string(type->start) + ", i32* " + start);
+        emit("store i32 " + to_string(type->end) + ", i32* " + end);
 
+
+        emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+             to_string(offset));
+
+        string toSave = freshReg();
+        emit(toSave + " = ptrtoint  i32* " + mallocPointerCast + " to i32");
+        emit("store i32 " + toSave + ", i32* " + stackP);
     }
 
 }
@@ -374,16 +407,12 @@ void return_exp_handler(N* e){
         string boolReg = bool_handler(exp);
         emit("ret i32 " + boolReg);
     }
-    else if(exp->type == "SET_"){
-
+    else if(exp->type == "SET"){ //SET_
+        emit("ret i32* " + exp->regName);
     }
     else{
         emit("ret i32 " + exp->regName);
     }
-}
-
-void break_handler(){
-
 }
 
 #endif //HW3_UTILS_H
