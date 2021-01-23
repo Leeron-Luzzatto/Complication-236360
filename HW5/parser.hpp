@@ -124,14 +124,20 @@ struct Expression : public N{
 struct Exp_list : public N{
     vector<string> types;
     vector<string> args;
+    vector<string> regNames;
+    vector<Expression*> expressions;
 
-    Exp_list(const string& type, const string& name = ""){
+    Exp_list(const string& type, const string& name = "", const string& reg ="", Expression* exp= nullptr){
         this->types.push_back(type);
         this->args.push_back(name);
+        this->regNames.push_back(reg);
+        this->expressions.push_back(exp);
     }
-    void addType(const string& type, const string& name = ""){
+    void addType(const string& type, const string& name = "", const string& reg = "", Expression* exp= nullptr){
         this->types.push_back(type);
         this->args.push_back(name);
+        this->regNames.push_back(reg);
+        this->expressions.push_back(exp);
     }
 
 };

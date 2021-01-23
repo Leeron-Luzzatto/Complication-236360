@@ -115,8 +115,10 @@ struct Exp_list : public N{
 
     Exp_list(const string& type){
         this->types.push_back(type);
+//        printf("Added var1: %s\n", type.c_str());
     }
     void addType(const string& type){
+//        printf("Added var: %s\n", type.c_str());
         this->types.push_back(type);
     }
 

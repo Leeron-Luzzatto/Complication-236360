@@ -354,7 +354,7 @@ public:
                     }
                     for(int l=0; l<function_args_types.size(); l++){
 
-//                        printf("%s %s\n", function_args_types[l].c_str(), args[args.size()-l-1].c_str());
+//                        printf("THIS IS A TEST = %s %s\n", function_args_types[l].c_str(), args[args.size()-l-1].c_str());
 
                         if(!checkValidAssign(function_args_types[l], args[args.size()-l-1])){
                             output::errorPrototypeMismatch(yylineno, func_name, function_args_types);

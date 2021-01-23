@@ -12,9 +12,7 @@
 using namespace std;
 
 int REG_COUNTER = 0;
-    int FUNC_COUNTER = 0;
-
-
+int FUNC_COUNTER = 0;
 int DIV_LABEL = 0;
 
 
@@ -62,14 +60,14 @@ vector<pair<int,BranchLabelIndex>> merge(const vector<pair<int,BranchLabelIndex>
     return CodeBuffer::instance().merge(l1, l2);
 }
 
-
 void init_llvm(){
-    emit("@.div_by_zero = constant [23 x i8] c\"Error division by zero\\00\"");
+    emitGlobal("@.div_by_zero = constant [23 x i8] c\"Error division by zero\\00\"");
     emitGlobal("@.int_specifier = constant [4 x i8] c\"%d\\0A\\00\"");
     emitGlobal("@.str_specifier = constant [4 x i8] c\"%s\\0A\\00\"");
 
     emit("declare i32 @printf(i8*, ...)");
     emit("declare void @exit(i32)");
+    emit("declare i8* @malloc(i32)");
 
     emit("define void @printi(i32) {");
     emit("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.int_specifier, i32 0, i32 0), i32 %0)");
@@ -80,6 +78,7 @@ void init_llvm(){
     emit("call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.str_specifier, i32 0, i32 0), i8* %0)");
     emit("ret void");
     emit("}");
+
 
 }
 
@@ -95,9 +94,7 @@ void check_zero_div(const string& reg){
     string falseLabel = freshDivLabel();
     emit("br i1 " + branchReg + ", label %" + trueLabel + ", label %" + falseLabel);
     emit(trueLabel + ":");
-    string zeroDivReg = freshReg();
-    emit(zeroDivReg + " = getelementptr [23 x i8], [23 x i8]* @.div_by_zero, i32 0, i32 0");
-    emit("call void @print(i8* " + zeroDivReg + ")");
+    emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.div_by_zero, i32 0, i32 0))");
     emit("call void @exit(i32 1)");
     emit("br label %" + falseLabel);
     emit(falseLabel + ":");
@@ -159,25 +156,11 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
 
 }
 
-void llvm_bool_handle(N* n, const string& reg){
-    Expression* exp = ((Expression*)exp);
-    if(exp->type=="BOOL") {
-        string branch = freshReg();
-        emit(branch + " = icmp eq i32 0, " + reg);
-        int address = emit("br i1 " + branch + ", label @, label @");
-        exp->falselist = makeList({address,SECOND});
-        exp->truelist = makeList({address,FIRST});
-    }
-    else{
-        exp->regName=reg;
-    }
-}
-
 void string_handler(N* n){
     Expression* exp = ((Expression*)exp);
     string strReg1 = freshStr();
-    string numB = to_string(exp->str.length()+1);
-    emitGlobal(strReg1 + " = constant [" + numB + " x i8] c\"" + exp->str + "\\00\"");
+    string numB = to_string(exp->name.length()+1 - 2);
+    emitGlobal(strReg1 + " = constant [" + numB + " x i8] c\"" + exp->name.substr(1, exp->name.length()-2) + "\\00\"");
     string strReg2 = freshReg();
     emit(strReg2 + " = getelementptr [" + numB + " x i8] , ["+ numB + " x i8]* " + strReg1 + ", i32 0, i32 0");
     exp->regName = strReg2;
@@ -205,36 +188,46 @@ void relop_handler(N* n, N* res, N* exp1, N* exp2){
     res->falselist = makeList({address, SECOND});
 }
 
+string bool_handler(Expression* exp){
+    string phiResult = freshReg();
+    string regResult = freshReg();
+    string fLabel = genLabel();
+    int falseAddress = emit("br label @");
+    string tLabel = genLabel();
+    int trueAddress = emit("br label @");
+    backPatch(exp->truelist, tLabel);
+    backPatch(exp->falselist, fLabel);
+    string phiLabel = genLabel();
+    backPatch(makeList({trueAddress,FIRST}), phiLabel);
+    backPatch(makeList({falseAddress,FIRST}), phiLabel);
+
+    string toLoad = freshReg();
+    emit(phiResult + " = phi i1 [0, %"+fLabel+"], [1, %"+tLabel+"]");
+    emit(toLoad + "= zext i1 "+ phiResult+" to i32");
+    if(!exp->label.empty()){
+        emit("br label %" + exp->label);
+    }
+    return toLoad;
+}
+
 void exp_handler(N* n, int offset){
     Expression* exp = ((Expression*)n);
     string stackP = freshReg();
-    if(exp->type != "BOOL"){
-        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
-        emit("store i32 " + exp->regName + ", i32* " + stackP);
-    }
-    else{
-        string phiResult = freshReg();
-        string regResult = freshReg();
-        string fLabel = genLabel();
-        int falseAddress = emit("br label @");
-        string tLabel = genLabel();
-        int trueAddress = emit("br label @");
-        backPatch(exp->truelist, tLabel);
-        backPatch(exp->falselist, fLabel);
-        string phiLabel = genLabel();
-        backPatch(makeList({trueAddress,FIRST}), phiLabel);
-        backPatch(makeList({falseAddress,FIRST}), phiLabel);
-
-        string toLoad = freshReg();
-        emit(phiResult + " = phi i1 [0, %"+fLabel+"], [1, %"+tLabel+"]");
-        emit(toLoad + "= zext i1 "+ phiResult+" to i32");
-        if(!exp->label.empty()){
-            emit("br label %" + exp->label);
-        }
+    if(exp->type == "BOOL"){
+        string  toLoad = bool_handler(exp);
         emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
         emit("store i32 " + toLoad + ", i32* " + stackP);
     }
+    else if(exp->type == "SET_"){
+
+    }
+    else{
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+        emit("store i32 " + exp->regName + ", i32* " + stackP);
+    }
 }
+
+
 
 void id_handler(N* n, int offset){
     Expression* exp = ((Expression*)n);
@@ -252,17 +245,113 @@ void id_handler(N* n, int offset){
     else if(exp->type != "BOOL"){
         exp->regName = tmp;
     }
-    else if(exp->type == "SET"){
+    else if(exp->type == "SET_"){
 
     }
 
 }
 
-void func_call(N* got_id, N* got_expList){
-    Expression* ID = ((Expression*)got_id);
-    Exp_list* expList = ((Exp_list*)got_expList);
+string set_type = ""; //TO DO: change this
 
+void func_call(N* got_id, N* got_expList, const string& retType){
+    Node* ID = ((Node*)got_id);
+    Exp_list* expList = ((Exp_list*)got_expList);
+    string llvmRetType;
+    if(retType == "VOID"){
+        llvmRetType = "void";
+    }
+    else if(retType == "SET_"){
+        llvmRetType = set_type;
+    }
+    else{
+        llvmRetType = "i32";
+    }
+    string param_list = "";
+    bool is_print = ID->val == "print";
+    for(int i=0; i<expList->types.size(); i++){
+        string currentType;
+        string currentReg;
+        if(is_print){
+            currentType = "i8*";
+            currentReg = expList->regNames[expList->types.size() -i -1];
+            }
+
+        else{
+            if(expList->types[expList->types.size() -i -1] == "BOOL"){
+                currentReg = bool_handler(expList->expressions[expList->types.size() -i -1]);
+                currentType = "i32";
+
+            }
+            else if(expList->types[expList->types.size() -i -1] == "SET_"){
+                currentType = set_type;
+            }
+            else{
+                currentType = "i32";
+                currentReg = expList->regNames[expList->types.size() -i -1];
+            }
+        }
+        if(i>0){
+            param_list += ", ";
+        }
+        param_list += currentType + " " + currentReg;
+    }
+//    printf("%s\n", param_list.c_str());
+    emit("call " + llvmRetType + " @" + ID->val + "(" + param_list + ")");
+}
+
+void func_call_noParam(N* got_id, const string& retType){
+    Node* ID = ((Node*)got_id);
+    string llvmRetType;
+    if(retType == "VOID"){
+        llvmRetType = "void";
+    }
+    else if(retType == "SET_"){
+        llvmRetType = set_type;
+    }
+    else{
+        llvmRetType = "i32";
+    }
+    emit("call " + llvmRetType + " @" + ID->val + "()");
+}
+
+void new_var_handler(N* t, N* id, int offset){
+    Type_var* type = ((Type_var*)t);
+    string stackP = freshReg();
+    //Handle SET init to empty group
+    if(type->type != "SET_") {
+        emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+             to_string(offset));
+        emit("store i32 0, i32* " + stackP);
+    }
+    else{
+//        string mallocP = freshReg();
+//        string sizeToAlloc = to_string(4 * 258); //Size of int(4B) *(MAX SET SIZE + 2 for range)
+//        emit( mallocP + " = call i8* @malloc(i32 " + sizeToAlloc + ") zeroinitializer");
+//        string mallocPointerCast = freshReg();
+//        emit(mallocPointerCast + " = bitcast i8* " + mallocP + " to i32*");
+//        emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+//             to_string(offset));
+//        emit("store i32 0, i32* " + stackP);
+//        emit("store i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j+1) + ", i32* " + reg);
+
+    }
 
 }
+
+void return_exp_handler(N* e){
+    Expression* exp = (Expression*)e;
+    if(exp->type == "BOOL"){
+        string boolReg = bool_handler(exp);
+        emit("ret i32 " + boolReg);
+    }
+    else if(exp->type == "SET_"){
+
+    }
+    else{
+        emit("ret i32 " + exp->regName);
+    }
+}
+
+
 
 #endif //HW3_UTILS_H
