@@ -17,6 +17,8 @@ struct N{
     vector<pair<int,BranchLabelIndex>> truelist;
     vector<pair<int,BranchLabelIndex>> falselist;
     vector<pair<int,BranchLabelIndex>> nextlist;
+    vector<pair<int,BranchLabelIndex>> breaklist;
+    vector<pair<int,BranchLabelIndex>> continuelist;
 
     N(){
         truelist = vector<pair<int,BranchLabelIndex>>();

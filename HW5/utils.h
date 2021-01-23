@@ -134,7 +134,7 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             emit(resReg + " = sub i32 " + reg1 + "," + reg2);
         }
         else if(binop == "+"){
-            emit(resReg + " = add i32 " + reg1 + "," + reg2);
+            emit(resReg + " = add i32 " + reg1 + "," + reg2 + " ; + operand");
         }
     }
     else if(resType == "BYTE"){
@@ -227,8 +227,6 @@ void exp_handler(N* n, int offset){
     }
 }
 
-
-
 void id_handler(N* n, int offset){
     Expression* exp = ((Expression*)n);
     string stackP = freshReg();
@@ -253,18 +251,25 @@ void id_handler(N* n, int offset){
 
 string set_type = ""; //TO DO: change this
 
-void func_call(N* got_id, N* got_expList, const string& retType){
+string func_call(N* got_id, N* got_expList, const string& retType, N* call){
     Node* ID = ((Node*)got_id);
     Exp_list* expList = ((Exp_list*)got_expList);
     string llvmRetType;
+    string retReg, callRes;
     if(retType == "VOID"){
         llvmRetType = "void";
+        retReg = "";
+        callRes = "";
     }
     else if(retType == "SET_"){
         llvmRetType = set_type;
+        retReg = freshReg();
+        callRes = retReg + " = ";
     }
     else{
         llvmRetType = "i32";
+        retReg = freshReg();
+        callRes = retReg + " = ";
     }
     string param_list = "";
     bool is_print = ID->val == "print";
@@ -296,22 +301,47 @@ void func_call(N* got_id, N* got_expList, const string& retType){
         param_list += currentType + " " + currentReg;
     }
 //    printf("%s\n", param_list.c_str());
-    emit("call " + llvmRetType + " @" + ID->val + "(" + param_list + ")");
+    emit(callRes + "call " + llvmRetType + " @" + ID->val + "(" + param_list + ")");
+    if(retType == "BOOL"){
+        string branch = freshReg();
+        emit(branch + " = icmp eq i32 0, " + retReg);
+        int address = emit("br i1 " + branch +", label @, label @");
+        call->falselist = makeList({address,FIRST});
+        call->truelist = makeList({address,SECOND});
+        return "";
+    }
+    return retReg;
 }
 
-void func_call_noParam(N* got_id, const string& retType){
+string func_call_noParam(N* got_id, const string& retType, N* call){
     Node* ID = ((Node*)got_id);
     string llvmRetType;
+    string retReg, callRes;
     if(retType == "VOID"){
         llvmRetType = "void";
+        retReg = "";
+        callRes = "";
     }
     else if(retType == "SET_"){
         llvmRetType = set_type;
+        retReg = freshReg();
+        callRes = retReg + " = ";
     }
     else{
         llvmRetType = "i32";
+        retReg = freshReg();
+        callRes = retReg + " = ";
     }
-    emit("call " + llvmRetType + " @" + ID->val + "()");
+    emit(callRes + "call " + llvmRetType + " @" + ID->val + "()");
+    if(retType == "BOOL"){
+        string branch = freshReg();
+        emit(branch + " = icmp eq i32 0, " + retReg);
+        int address = emit("br i1 " + branch +", label @, label @");
+        call->falselist = makeList({address,FIRST});
+        call->truelist = makeList({address,SECOND});
+        return "";
+    }
+    return retReg;
 }
 
 void new_var_handler(N* t, N* id, int offset){
@@ -352,6 +382,8 @@ void return_exp_handler(N* e){
     }
 }
 
+void break_handler(){
 
+}
 
 #endif //HW3_UTILS_H
