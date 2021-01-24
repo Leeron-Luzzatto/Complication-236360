@@ -104,7 +104,7 @@ struct Type_var : public N{
         this->start = s;
         this->end = e;
         if(type == "SET"){
-            if(this->end - this->start >255 || this->end - this->start <= 0){
+            if(this->end - this->start + 1 > 256 || this->end - this->start <= 0){
                 output::errorSetTooLarge(yylineno, start, End);
                 exit(0);
             }

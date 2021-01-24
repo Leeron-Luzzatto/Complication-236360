@@ -114,7 +114,7 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                             int offset = table->getVarOffset($2);
                                             string stackP = freshReg();
                                             //Handle SET_ init to empty group
-                                            new_var_handler($1, $2, offset);
+                                            new_var_handler($1, offset, $$);
                                             delete $2;
                                             }
                                             |
@@ -122,7 +122,7 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                             table->checkValidAssign($2, $4);
                                             $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val, $4);
                                             int offset = table->getVarOffset($2);
-                                            exp_handler($4, offset);
+                                            exp_handler($4, $1, offset, $$);
                                             delete $1;
                                             delete $2;
                                             delete $3;
@@ -131,9 +131,9 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                                 output::errorUndef(yylineno, ((Node*)$1)->val);
                                                 exit(1);
                                            }
-                                           table->checkValidAssign($1, $3);
+                                           string type = table->checkValidAssign($1, $3);
                                            int offset = table->getVarOffset($1);
-                                           exp_handler($3, offset);
+                                           assign_to_exist($3, offset, $$, type);
                                            }  |
                 Call SC                    {$$ = $1;}  |
                 RETURN SC                  {table->checkCurrFuncVoid(); emit("ret void");}  |
@@ -167,7 +167,6 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                                                   }  |
                 WHILE M LPAREN Exp RPAREN EnterWhile M Statement {check_valid_bool(((Expression*)$4)->type);
                                                                   table->ScopeEnd();
-
                                                                   backPatch($8->nextlist, ((Node*)$2)->val);
                                                                   backPatch($4->truelist, ((Node*)$7)->val);
                                                                   backPatch($8->continuelist, ((Node*)$2)->val);
@@ -240,7 +239,8 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      $$->regName = freshReg();
                                      //$$$$$$$$$$$$$$$$$$$$$$$NEED TO HANDE SET_ CASE
                                      ((Expression*)$$)->name = ((Expression*)$1)->name + " + " + ((Expression*)$2)->name;
-                                     operand_handler_with_set(type, ((Node*)$2)->val, $$->regName, $1->regName, $3->regName);
+                                     int offset = table->getVarOffset($2);
+                                     operand_handler_with_set(type, ((Node*)$2)->val, $$->regName, $1, $3, $$);
                                      delete $1;
                                      delete $3;}   |
                 ID                  {string type = table->getVarType($1);
@@ -325,10 +325,12 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      //$$$$$$$$$NEED TO HANDLE THOSE SET_ CASES
                 Exp RELOP_IN Exp    {check_valid_in(((Expression*)$1)->type,((Expression*)$3)->type);
                                     $$ = new Expression("BOOL");
+                                    set_in_handler($1, $3, $$);
                                     delete $1;
                                     delete $3;}   |
                 LPAREN Type RPAREN Exp  {checkValidCast(((Type_var*)$2)->type, ((Expression*)$4)->type);
                                          $$ = new Expression("INT");
+                                         getSetSize($4, $$);
                                          }
             ;
 

@@ -202,15 +202,9 @@ public:
         string llvm_ret_type = retType == "VOID" ? "void" : "i32";
         string args_list = "";
         for(int j = 0; j<argTypes.size(); j++){
-            if(argTypes[j] != "SET") {
-                args_list += "i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1);
-            }
-            else{
-                args_list += "i32* %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1);
-            }
-
+            args_list += "i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1);
             if(j < argTypes.size() - 1){
-                emit(", ")
+                emit(", ");
             }
         }
 
@@ -220,14 +214,7 @@ public:
         for(int j = 0; j<argTypes.size(); j++){
             string reg = freshReg();
             emit(reg + "= getelementptr inbounds i32, i32* "   + stack + ", i32 " + to_string(j));
-            if(argTypes[j] != "SET") {
-                emit("store i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1) + ", i32* " + reg);
-            }
-            else{
-                string pointerCast = freshReg();
-                emit(pointerCast + " = ptrtoint  i32* %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1));
-                emit("store i32 " + pointerCast + ", i32* " + reg);
-            }
+            emit("store i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1) + ", i32* " + reg);
         }
 
     }
@@ -332,7 +319,7 @@ public:
         }
         return -10;
     }
-    void checkValidAssign(N* id, N* exp){
+    string checkValidAssign(N* id, N* exp){
         string var_type = getVarType(id);
         // Var exists, check types
         string exp_type = ((Expression*)exp)->type;
@@ -348,6 +335,7 @@ public:
             output::errorByteTooLarge(yylineno, to_string(((Expression*)exp)->number));
             exit(0);
         }
+        return var_type;
     }
     void checkCurrFuncVoid(){
         for(int i=table->size() - 1; i>=0; i--){
