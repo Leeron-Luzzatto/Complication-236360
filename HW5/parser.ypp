@@ -238,8 +238,6 @@ Exp         :   LPAREN Exp RPAREN   {$$ = $2;}   |
                                      $$ = new Expression(type);
                                      $$->regName = freshReg();
                                      //$$$$$$$$$$$$$$$$$$$$$$$NEED TO HANDE SET_ CASE
-                                     ((Expression*)$$)->name = ((Expression*)$1)->name + " + " + ((Expression*)$2)->name;
-                                     int offset = table->getVarOffset($2);
                                      operand_handler_with_set(type, ((Node*)$2)->val, $$->regName, $1, $3, $$);
                                      delete $1;
                                      delete $3;}   |
@@ -347,7 +345,7 @@ M:          {
 
 int main()
 {
-
+    
 	 return yyparse();
 
 }

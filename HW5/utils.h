@@ -144,11 +144,11 @@ void checkRange(const string& setPointer, const string& num, const string& op){
     emit(fromP + " = getelementptr inbounds i32, i32* " + setPointer + ", i32 1");
     string from = freshReg();
     emit(from + " = load i32, i32* " + fromP + " ; SET from value");
-    //Last element @@@@Remember we added 3!
+    //Last element @@@@Remember we added 4!
     string temp = freshReg();
     emit(temp + " = add i32 " + from + ", " + setSize);
     string To = freshReg();
-    emit(To + " = sub i32 " + temp + ", 3");
+    emit(To + " = sub i32 " + temp + ", 4");
     //Check exp value is bigger then from
     string isBiggerFrom = freshReg();
     emit(isBiggerFrom + " = icmp sgt i32 " + num + ", " + To);
@@ -162,15 +162,25 @@ void checkRange(const string& setPointer, const string& num, const string& op){
     emit("br i1 " + isSmallerTo + ", label %" + errorLabel + ", label %" + PassAll);
     emit(errorLabel + ":");
     if(op == "in"){
-        emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.set_range_in, i32 0, i32 0))");
+        emit("call void @print(i8* getelementptr ([31 x i8], [31 x i8]* @.set_range_in, i32 0, i32 0))");
     }
     else if(op == "+"){
-        emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.set_range_plus, i32 0, i32 0))");
+        emit("call void @print(i8* getelementptr ([30 x i8], [30 x i8]* @.set_range_plus, i32 0, i32 0))");
     }
     else{
-        emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.set_range_minus, i32 0, i32 0))");
+        emit("call void @print(i8* getelementptr ([30 x i8], [30 x i8]* @.set_range_minus, i32 0, i32 0))");
     }
+
+    //DEBUG
+//    string err = freshStr();
+//    string str_len = "9";
+//    emitGlobal(err + " = constant [" + str_len + " x i8] c\"GOT HERE\\00\"");
+//    string to_print = freshReg();
+//    emit(to_print + " = getelementptr [" + str_len + " x i8], [" + str_len + " x i8]* " + err + ", i32 0, i32 0");
+//    emit("call void @print(i8* " + to_print + ")");
+
     emit("call void @exit(i32 1)");
+    emit("ret void");
     emit(PassAll + ":");
 }
 
@@ -312,7 +322,7 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             string numElements = freshReg();
             emit(numElements + " = load i32, i32* " + numElementsP);
             string newSize = freshReg();
-            emit(newSize + " = sub i32 1, " + numElements);
+            emit(newSize + " = sub i32 "+ numElements + ", 1");
             emit("store i32 " + newSize + ", i32* " + numElementsP);
             emit("br label %" + falseLabel);
             emit(falseLabel + ":");
@@ -435,7 +445,7 @@ void id_handler(N* n, int offset){
         exp->falselist = makeList({address, FIRST});
         exp->truelist = makeList({address, SECOND});
     }
-    else(exp->type != "BOOL"){
+    else{
         exp->regName = tmp;
     }
 
@@ -546,7 +556,7 @@ void new_var_handler(N* t, int offset, N* statement){
     }
     else{
         string malloci8 = freshReg();
-        string sizeToAlloc = to_string(4 * (type->end - type->start + 4)); //Size of int(4B) *(MAX SET SIZE + 2 for range)
+        string sizeToAlloc = to_string(4 * (type->end - type->start + 4)); //Size of int(4B) *(SET SIZE + 4)
         emit( malloci8 + " = call i8* @malloc(i32 " + sizeToAlloc + ")");
         string malloci32 = freshReg();
         emit(malloci32 + " = bitcast i8* " + malloci8 + " to i32*");
@@ -696,7 +706,7 @@ void getSetSize(N* s, N* res){
     emit(sizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 2");
     string size = freshReg();
     emit(size + " = load i32, i32* " + sizeP);
-    res->regName == size;
+    res->regName = size;
 }
 
 #endif //HW3_UTILS_H
