@@ -36,8 +36,9 @@ public:
     vector<Entry*>* entries;
     int max_offset;
     bool while_scope;
+    bool is_function_scope;
 
-    Scope(int maxOffset, bool whileScope = false) : max_offset(maxOffset), while_scope(whileScope) {
+    Scope(int maxOffset, bool whileScope = false, bool isFunc = false) : max_offset(maxOffset), while_scope(whileScope), is_function_scope(isFunc) {
         entries = new vector<Entry*>();
     }
 
@@ -185,7 +186,7 @@ public:
         string funcType = output::makeFunctionType(retType, argTypes);
         table->back()->addEntry(func_name, funcType, 0, argTypes, true, retType);
 
-        auto* new_scope = new Scope(max_offset);
+        auto* new_scope = new Scope(max_offset, false, true);
         int i = -1;
         for (int j=0; j<argNames.size(); j++){
             if(isVarDeclared(argNames[j]) || isFuncDeclared(argNames[j])){
@@ -204,7 +205,7 @@ public:
         for(int j = 0; j<argTypes.size(); j++){
             args_list += "i32 %func" + to_string(FUNC_COUNTER) + "arg" + to_string(j + 1);
             if(j < argTypes.size() - 1){
-                emit(", ");
+                args_list += ", ";
             }
         }
 
@@ -219,12 +220,34 @@ public:
 
     }
     int addVar(N* type, N* name){
+//
+//        int offset = 0;
+//        printf("before\n");
+//        for(auto s : *table){
+//            for(auto e : *s->entries){
+//                if(e->is_function) continue;
+//                printf("%s %d\n", e->name.c_str(), offset);
+//                offset++;
+//            }
+//        }
+
         Scope* scope = table->back();
         if(isVarDeclared(name) || isFuncDeclared(name)){
             output::errorDef(yylineno, ((Node*)name)->val);
             exit(0);
         }
         scope->addVar(((Node*)name)->val, ((Type_var*)type)->type, max_offset);
+
+//        offset = 0;
+//        printf("after\n");
+//        for(auto s : *table){
+//            for(auto e : *s->entries){
+//                if(e->is_function) continue;
+//                printf("%s %d\n", e->name.c_str(), offset);
+//                offset++;
+//            }
+//        }
+
         return max_offset++;
 
 //        printf("Global offset increased to %d by %s\n", max_offset, ((Node*)name)->val.c_str());
@@ -302,21 +325,47 @@ public:
             output::errorUndef(yylineno, name);
             exit(0);
         }
-        //We know variable exits
-        for(int i=table->size() - 1; i>=0; i--){
-            Scope* scope = (*table)[i];
-            for(int j=0; j<scope->entries->size(); j++){
-                Entry* e = (*(scope->entries))[j];
+
+//        for(auto s : *table){
+//            for(auto e : *s->entries){
+//                if(e->is_function) continue;
+//                printf("%s %d\n", e->name.c_str(), offset);
+//                offset++;
+//            }
+//        }
+
+        for(auto s : *table){
+            for(auto e : *s->entries){
+//                printf("%s %d\n", e->name.c_str(), offset);
                 if(e->name == name){
-                    //Found it, return offset
                     return offset;
                 }
-                if(e->is_function){
-                    continue;
-                }
+                if(e->is_function) continue;
                 offset++;
             }
         }
+
+
+
+        //We know variable exits
+//        for(int i=table->size() - 1; i>=0; i--){
+//            Scope* scope = (*table)[i];
+//            for(int j=0; j<scope->entries->size(); j++){
+//                Entry* e = (*(scope->entries))[j];
+//
+//                printf("%s %d\n", e->name.c_str(),  offset);
+//
+//                if(e->name == name){
+//                    //Found it, return offset
+//                    return offset;
+//                }
+//                if(e->is_function){
+//                    continue;
+//                }
+//
+//                offset++;
+//            }
+//        }
         return -10;
     }
     string checkValidAssign(N* id, N* exp){

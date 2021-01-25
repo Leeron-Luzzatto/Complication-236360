@@ -85,6 +85,7 @@ void init_llvm(){
     emit("}");
 }
 
+
 void func_end(const string& retType){
     (retType == "VOID") ? emit("ret void") : emit("ret i32 0");
     emit("}");
@@ -97,9 +98,9 @@ void check_zero_div(const string& reg){
     string falseLabel = freshINLabel();
     emit("br i1 " + branchReg + ", label %" + trueLabel + ", label %" + falseLabel);
     emit(trueLabel + ":");
-    emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.div_by_zero, i32 0, i32 0))");
+    emit("call void @print(i8* getelementptr ([23 x i8], [23 x i8]* @.div_by_zero, i32 0, i32 0)) ; check zero div");
     emit("call void @exit(i32 1)");
-    emit("br label %" + falseLabel);
+    emit("br label %" + falseLabel + " ; check zero div1");
     emit(falseLabel + ":");
 }
 
@@ -134,14 +135,14 @@ void operand_handler_no_set(const string& resType, const string& binop, const st
 void checkRange(const string& setPointer, const string& num, const string& op){
     //Set size
     string setSizeP = freshReg();
-    emit(setSizeP + " = getelementptr inbounds i32, i32* " + setPointer + ", i32 0");
+    emit(setSizeP + " = getelementptr inbounds i32, i32* " + setPointer + ", i32 0 ; check set range1");
     string setSizeB = freshReg();
     emit(setSizeB + " = load i32, i32* " + setSizeP);
     string setSize = freshReg();
     emit(setSize + " = sdiv i32 " + setSizeB + ", 4");
     //First element
     string fromP = freshReg();
-    emit(fromP + " = getelementptr inbounds i32, i32* " + setPointer + ", i32 1");
+    emit(fromP + " = getelementptr inbounds i32, i32* " + setPointer + ", i32 1 ; check set range2");
     string from = freshReg();
     emit(from + " = load i32, i32* " + fromP + " ; SET from value");
     //Last element @@@@Remember we added 4!
@@ -180,7 +181,7 @@ void checkRange(const string& setPointer, const string& num, const string& op){
 //    emit("call void @print(i8* " + to_print + ")");
 
     emit("call void @exit(i32 1)");
-    emit("ret void");
+    emit("br label %" + PassAll + " ; set check range 1");
     emit(PassAll + ":");
 }
 
@@ -201,7 +202,7 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             emit(tmp1 + " = sub i32 " + e1->regName + "," + e2->regName);
         }
         else if(binop == "+"){
-            emit(tmp1 + " = add i32 " + e1->regName + "," + e1->regName);
+            emit(tmp1 + " = add i32 " + e1->regName + "," + e2->regName);
         }
         emit(tmp2 + " = trunc i32 " + tmp1 + " to i8");
         emit(resReg + "= zext i8 " + tmp2 + " to i32");
@@ -224,12 +225,12 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             checkRange(setP, num->regName, binop);
             //Set size
             string setSizeP = freshReg();
-            emit(setSizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0");
+            emit(setSizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0 ; operand handler with set +");
             string setSize = freshReg();
             emit(setSize + " = load i32, i32* " + setSizeP);
             //Get first index
             string fromP = freshReg();
-            emit(fromP + " = getelementptr inbounds i32, i32* " + setP + ", i32 1");
+            emit(fromP + " = getelementptr inbounds i32, i32* " + setP + ", i32 1 ; op with set 2");
             string from = freshReg();
             emit(from + " = load i32, i32* " + fromP);
             //Allocate new SET
@@ -249,7 +250,7 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             string location = freshReg();
             emit(location + " = add i32 3, " + temp);
             string locationP = freshReg();
-            emit(locationP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 " + location);
+            emit(locationP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 " + location + " ; op with set3");
             string curr = freshReg();
             emit(curr + " = load i32, i32* " + locationP);
 
@@ -262,13 +263,13 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
 
             emit("store i32 1, i32* " + locationP);
             string numElementsP = freshReg();
-            emit(numElementsP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 2");
+            emit(numElementsP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 2 ; op with set3");
             string numElements = freshReg();
             emit(numElements + " = load i32, i32* " + numElementsP);
             string newSize = freshReg();
             emit(newSize + " = add i32 1, " + numElements);
             emit("store i32 " + newSize + ", i32* " + numElementsP);
-            emit("br label %" + falseLabel);
+            emit("br label %" + falseLabel + " ; op with set1");
             emit(falseLabel + ":");
 
             resExp->regName = setToSave;
@@ -280,12 +281,12 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             checkRange(setP, num->regName, binop);
             //Set size
             string setSizeP = freshReg();
-            emit(setSizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0");
+            emit(setSizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0 ; op with set4");
             string setSize = freshReg();
             emit(setSize + " = load i32, i32* " + setSizeP);
             //Get first index
             string fromP = freshReg();
-            emit(fromP + " = getelementptr inbounds i32, i32* " + setP + ", i32 1");
+            emit(fromP + " = getelementptr inbounds i32, i32* " + setP + ", i32 1 ; op with set5");
             string from = freshReg();
             emit(from + " = load i32, i32* " + fromP);
             //Allocate new SET
@@ -305,7 +306,7 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
             string location = freshReg();
             emit(location + " = add i32 3, " + temp);
             string locationP = freshReg();
-            emit(locationP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 " + location);
+            emit(locationP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 " + location + " ; op with set6");
             string curr = freshReg();
             emit(curr + " = load i32, i32* " + locationP);
 
@@ -318,15 +319,14 @@ void operand_handler_with_set(const string& resType, const string& binop, const 
 
             emit("store i32 0, i32* " + locationP);
             string numElementsP = freshReg();
-            emit(numElementsP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 2");
+            emit(numElementsP + " = getelementptr inbounds i32, i32* " + seti32 + ", i32 2 ; op with set7");
             string numElements = freshReg();
             emit(numElements + " = load i32, i32* " + numElementsP);
             string newSize = freshReg();
             emit(newSize + " = sub i32 "+ numElements + ", 1");
             emit("store i32 " + newSize + ", i32* " + numElementsP);
-            emit("br label %" + falseLabel);
+            emit("br label %" + falseLabel + " ; op with set 2");
             emit(falseLabel + ":");
-
             resExp->regName = setToSave;
         }
     }
@@ -339,7 +339,7 @@ void string_handler(N* n){
     string numB = to_string(exp->name.length()+1 - 2);
     emitGlobal(strReg1 + " = constant [" + numB + " x i8] c\"" + exp->name.substr(1, exp->name.length()-2) + "\\00\"");
     string strReg2 = freshReg();
-    emit(strReg2 + " = getelementptr [" + numB + " x i8] , ["+ numB + " x i8]* " + strReg1 + ", i32 0, i32 0");
+    emit(strReg2 + " = getelementptr [" + numB + " x i8] , ["+ numB + " x i8]* " + strReg1 + ", i32 0, i32 0 ; from string");
     exp->regName = strReg2;
 }
 
@@ -369,9 +369,9 @@ string bool_handler(Expression* exp){
     string phiResult = freshReg();
     string regResult = freshReg();
     string fLabel = genLabel();
-    int falseAddress = emit("br label @");
+    int falseAddress = emit("br label @ ; bool handler1");
     string tLabel = genLabel();
-    int trueAddress = emit("br label @");
+    int trueAddress = emit("br label @ ; bool handler 2");
     backPatch(exp->truelist, tLabel);
     backPatch(exp->falselist, fLabel);
     string phiLabel = genLabel();
@@ -382,7 +382,7 @@ string bool_handler(Expression* exp){
     emit(phiResult + " = phi i1 [0, %"+fLabel+"], [1, %"+tLabel+"]");
     emit(toLoad + "= zext i1 "+ phiResult+" to i32");
     if(!exp->label.empty()){
-        emit("br label %" + exp->label);
+        emit("br label %" + exp->label + " ; bool handler 3");
     }
     return toLoad;
 }
@@ -393,15 +393,16 @@ void exp_handler(N* e, N* t, int offset, N* statement){
     string stackP = freshReg();
     if(exp->type == "BOOL"){
         string  toLoad = bool_handler(exp);
-        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+                                        to_string(offset) + " ; from exp bool handler");
         emit("store i32 " + toLoad + ", i32* " + stackP);
     }
-    if(exp->type == "SET"){
+    else if(exp->type == "SET"){
         string setP = freshReg();
         emit(setP + " = inttoptr i32 " + exp->regName + " to i32* ; Cast set from i32 to i32* again");
 
         string sizeP = freshReg();
-        emit(sizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0");
+        emit(sizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 0 ; from exp set handler");
         string size = freshReg();
         emit(size + " = load i32, i32* " + sizeP);
         string mallocSize = freshReg();
@@ -427,7 +428,8 @@ void exp_handler(N* e, N* t, int offset, N* statement){
         statement->regName = setToSave;
     }
     else{
-        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+                                        to_string(offset) + "; from int or byte exp handler");
         emit("store i32 " + exp->regName + ", i32* " + stackP);
     }
 }
@@ -435,7 +437,8 @@ void exp_handler(N* e, N* t, int offset, N* statement){
 void id_handler(N* n, int offset){
     Expression* exp = ((Expression*)n);
     string stackP = freshReg();
-    emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
+    emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
+                                    to_string(offset) + "; from id handler");
     string tmp = freshReg();
     emit(tmp + "= load i32, i32* " + stackP);
     if(exp->type == "BOOL"){
@@ -448,13 +451,12 @@ void id_handler(N* n, int offset){
     else{
         exp->regName = tmp;
     }
-
-
 }
 
 string func_call(N* got_id, N* got_expList, const string& retType, N* call){
-//    int address = emit("br label @");
-//    got_expList->nextlist = makeList({address, FIRST});
+    int address = emit("br label @ ; func call 1");
+    got_expList->nextlist = makeList({address, FIRST});
+
     Node* ID = ((Node*)got_id);
     Exp_list* expList = ((Exp_list*)got_expList);
     string llvmRetType;
@@ -490,15 +492,16 @@ string func_call(N* got_id, N* got_expList, const string& retType, N* call){
                 currentReg = expList->regNames[expList->types.size() -i -1];
             }
         }
-        if(i<expList->types.size() - 1){
+        param_list += currentType + " " + currentReg;
+
+        if(i < expList->types.size() - 1){
             param_list += ", ";
         }
-        param_list += currentType + " " + currentReg;
     }
-//    address = emit("br label @");
-//    string label = genLabel();
+    address = emit("br label @ ; func call 2");
+    string label = genLabel();
     emit(callRes + "call " + llvmRetType + " @" + ID->val + "(" + param_list + ")");
-//    backPatch(merge(makeList({address, FIRST}), got_expList->nextlist), label);
+    backPatch(merge(makeList({address, FIRST}), got_expList->nextlist), label);
     if(retType == "BOOL"){
         string branch = freshReg();
         emit(branch + " = icmp eq i32 0, " + retReg);
@@ -530,10 +533,10 @@ string func_call_noParam(N* got_id, const string& retType, N* call){
         callRes = retReg + " = ";
     }
 
-//    int address = emit("br label @");
-//    string label = genLabel();
+    int address = emit("br label @ ; fun no param 1");
+    string label = genLabel();
     emit(callRes + "call " + llvmRetType + " @" + ID->val + "()");
-//    backPatch(makeList({address, FIRST}), label);
+    backPatch(makeList({address, FIRST}), label);
     if(retType == "BOOL"){
         string branch = freshReg();
         emit(branch + " = icmp eq i32 0, " + retReg);
@@ -551,7 +554,7 @@ void new_var_handler(N* t, int offset, N* statement){
     //Handle SET_ init to empty group
     if(type->type != "SET") {
         emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
-             to_string(offset));
+             to_string(offset) + "; from new var not set handler");
         emit("store i32 0, i32* " + stackP);
     }
     else{
@@ -563,7 +566,7 @@ void new_var_handler(N* t, int offset, N* statement){
 
         for(int i = 2; i < type->end - type->start + 4; i++){
             string temp = freshReg();
-            emit(temp + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 " + to_string(i));
+            emit(temp + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 " + to_string(i) + "; from new var set handler1");
             emit("store i32 0, i32* " + temp);
         }
 //        emit("store i32 zeroinitializer, i32* " + malloci32);
@@ -587,7 +590,7 @@ void new_var_handler(N* t, int offset, N* statement){
 
 
         emit(stackP + " = getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " +
-             to_string(offset));
+             to_string(offset) + " ; from new var set handler2");
 
         string toSave = freshReg();
         emit(toSave + " = ptrtoint  i32* " + malloci32 + " to i32");
@@ -597,11 +600,11 @@ void new_var_handler(N* t, int offset, N* statement){
         string startP = freshReg();
         string size = freshReg();
         string start = freshReg();
-        emit(sizeP + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 0");
+        emit(sizeP + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 0 ; from new var set3");
         emit(size + " = add i32 0, " + sizeToAlloc);
         emit("store i32 " + size + ", i32* " + sizeP + " ; Store SET size in block #0");
 
-        emit(startP + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 1");
+        emit(startP + " = getelementptr inbounds i32, i32* " + malloci32 + ", i32 1 ; from new var set3");
         emit(start + " = add i32 0, " + to_string(type->start));
         emit("store i32 " + start + ", i32* " + startP + " ; store SET start index in block #1");
 
@@ -612,15 +615,17 @@ void new_var_handler(N* t, int offset, N* statement){
 void assign_to_exist(N* e, int offset, N* statement, const string& type){
     Expression* exp = ((Expression*)e);
     string stackP = freshReg();
-    emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 " + to_string(offset));
     if(exp->type == "BOOL"){
         string  toLoad = bool_handler(exp);
-        emit("store i32 " + toLoad + ", i32* " + stackP);
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 "
+             + to_string(offset) + " ; from assign to exist");
+        emit("store i32 " + toLoad + ", i32* " + stackP + " ; from assign to exist bool");
     }
-
-    if(exp->type == "SET"){
+    else if(exp->type == "SET"){
         //free old SET
         string oldSeti32 = freshReg();
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 "
+             + to_string(offset) + " ; from assign to exist");
         emit(oldSeti32 + " = load i32, i32* " + stackP);
         string oldSetP32 = freshReg();
         emit(oldSetP32 + " = inttoptr i32 " + oldSeti32 + " to i32*");
@@ -635,7 +640,7 @@ void assign_to_exist(N* e, int offset, N* statement, const string& type){
         emit(srcSeti8 + " = bitcast i32* " + srcSeti32 + " to i8*");
 
         string sizeP = freshReg();
-        emit(sizeP + " = getelementptr inbounds i32, i32* " + srcSeti32 + ", i32 0");
+        emit(sizeP + " = getelementptr inbounds i32, i32* " + srcSeti32 + ", i32 0 ; from assign to exist set1");
         string size = freshReg();
         emit(size + " = load i32, i32* " + sizeP);
         string mallocSize = freshReg();
@@ -654,6 +659,8 @@ void assign_to_exist(N* e, int offset, N* statement, const string& type){
         statement->regName = setToSave;
     }
     else{
+        emit(stackP + "= getelementptr inbounds i32, i32* %func" + to_string(FUNC_COUNTER) + "args, i32 "
+             + to_string(offset) + " ; from assign to exist");
         emit("store i32 " + exp->regName + ", i32* " + stackP);
     }
 }
@@ -678,7 +685,7 @@ void set_in_handler(N* n, N* s, N* res){
     checkRange(seti32, num->regName, "in");
     
     string fromP = freshReg();
-    emit(fromP + " = getelementptr inbounds i32, i32* " + seti32 + ",i32 1");
+    emit(fromP + " = getelementptr inbounds i32, i32* " + seti32 + ",i32 1 ; from set in handler1");
     string from = freshReg();
     emit(from + " = load i32, i32* " + fromP);
 
@@ -687,7 +694,7 @@ void set_in_handler(N* n, N* s, N* res){
     string location = freshReg();
     emit(location + " = add i32 3, " + temp);
     string numP = freshReg();
-    emit(numP + " = getelementptr inbounds i32, i32* " + seti32 + ",i32 " + location);
+    emit(numP + " = getelementptr inbounds i32, i32* " + seti32 + ",i32 " + location + " ; from set in handler2");
     string SetNumCell = freshReg();
     emit(SetNumCell + " = load i32,i32* " + numP);
 
@@ -703,7 +710,7 @@ void getSetSize(N* s, N* res){
     string setP = freshReg();
     emit(setP + " = inttoptr i32 " + set->regName + " to i32*");
     string sizeP = freshReg();
-    emit(sizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 2");
+    emit(sizeP + " = getelementptr inbounds i32, i32* " + setP + ", i32 2 ; get set size");
     string size = freshReg();
     emit(size + " = load i32, i32* " + sizeP);
     res->regName = size;

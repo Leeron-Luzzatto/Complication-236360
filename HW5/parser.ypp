@@ -122,6 +122,7 @@ Statement   :   LBRACE {table->newScope();} Statements RBRACE {table->ScopeEnd()
                                             table->checkValidAssign($2, $4);
                                             $$ = new Argument(((Type_var*)$1)->type, ((Node*)$2)->val, $4);
                                             int offset = table->getVarOffset($2);
+                                            //printf("offset %s = %d\n", ((Node*)$2)->val.c_str(), offset);
                                             exp_handler($4, $1, offset, $$);
                                             delete $1;
                                             delete $2;
@@ -215,7 +216,14 @@ Call        :   ID LPAREN ExpList RPAREN{
             ;
 
 ExpList     :   Exp{$$ = new Exp_list(((Expression*)$1)->type, ((Expression*)$1)->name, $1->regName, ((Expression*)$1));}   |
-                Exp COMMA ExpList{$$ = ((Exp_list*)$3); ((Exp_list*)$$)->addType(((Expression*)$1)->type, ((Expression*)$1)->name, $1->regName, ((Expression*)$1)) ;}
+                Exp {if(((Expression*)$1)->type == "BOOL"){
+                     				$1->label = genLabel();}
+                     }
+
+                    COMMA ExpList{$$ = ((Exp_list*)$4);
+                                  ((Exp_list*)$$)->addType(((Expression*)$1)->type, ((Expression*)$1)->name, $1->regName, ((Expression*)$1)) ;
+
+                                  }
             ;
 
 Type        :   INT{$$ = new Type_var("INT");}   |   BYTE{$$ = new Type_var("BYTE");}  |
